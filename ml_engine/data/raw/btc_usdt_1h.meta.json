@@ -1,0 +1,9 @@
+{
+  "source": "binance via ccxt",
+  "symbol": "BTC/USDT",
+  "timeframe": "1h",
+  "rows": 17519,
+  "first_candle_utc": "2024-10-17 15:00:00+00:00",
+  "last_candle_utc": "2026-10-17 13:00:00+00:00",
+  "collected_at_utc": "2026-10-17T14:35:47.381708+00:00"
+}

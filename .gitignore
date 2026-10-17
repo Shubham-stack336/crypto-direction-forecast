@@ -1,0 +1,20 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+
+# Secrets and local config
+.env
+.env.local
+
+# Local analysis output
+ml_engine/data/return_hist.png
+
+# OS / editor
+.DS_Store
+Thumbs.db

@@ -1,0 +1,85 @@
+{
+  "candidate_model": "random_forest",
+  "test_period": [
+    "2026-06-30 14:00:00+00:00",
+    "2026-10-17 10:00:00+00:00"
+  ],
+  "test_rows": 2613,
+  "test_class_distribution": {
+    "SIDEWAYS": 1421,
+    "UP": 628,
+    "DOWN": 564
+  },
+  "results": {
+    "random_forest": {
+      "accuracy": 0.4856486796785304,
+      "balanced_accuracy": 0.3987928831982688,
+      "macro_f1": 0.39736393350354865,
+      "directional_hit_rate": 0.5462633451957295,
+      "confusion_matrix_rows_true_cols_pred": [
+        [
+          169,
+          303,
+          92
+        ],
+        [
+          276,
+          962,
+          183
+        ],
+        [
+          163,
+          327,
+          138
+        ]
+      ]
+    },
+    "logistic_regression": {
+      "accuracy": 0.5097588978185993,
+      "balanced_accuracy": 0.3775352712345723,
+      "macro_f1": 0.3676584326557455,
+      "directional_hit_rate": 0.5075757575757576,
+      "confusion_matrix_rows_true_cols_pred": [
+        [
+          92,
+          392,
+          80
+        ],
+        [
+          128,
+          1131,
+          162
+        ],
+        [
+          115,
+          404,
+          109
+        ]
+      ]
+    },
+    "naive_most_frequent": {
+      "accuracy": 0.5438193647148871,
+      "balanced_accuracy": 0.3333333333333333,
+      "macro_f1": 0.23483721698892746,
+      "directional_hit_rate": null,
+      "confusion_matrix_rows_true_cols_pred": [
+        [
+          0,
+          564,
+          0
+        ],
+        [
+          0,
+          1421,
+          0
+        ],
+        [
+          0,
+          628,
+          0
+        ]
+      ]
+    }
+  },
+  "note": "Test set evaluated once. Logistic regression and naive are reference only."
+}

@@ -1,0 +1,39 @@
+# Render Blueprint: PostgreSQL + FastAPI web service.
+# Field names follow https://render.com/docs/blueprint-spec (checked 2026-10-17).
+#
+# Free web services have NO pre-deploy command, so migrations run at the start of startCommand.
+# That is safe with a single instance (free plan). If you scale to several instances, move the
+# `alembic upgrade head` step to preDeployCommand on a paid plan.
+
+# Region: Binance usually refuses US IP addresses, and Render's default region (oregon) is in the US,
+# so both resources are placed in frankfurt. They must share a region for the internal database URL.
+databases:
+  - name: crypto-predictions-db
+    region: frankfurt
+    plan: free              # free Postgres expires 30 days after creation; upgrade to keep the data
+    databaseName: crypto_predictions
+    user: crypto_app
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: crypto-direction-api
+    runtime: python
+    region: frankfurt
+    plan: free              # spins down after 15 minutes without traffic; first request wakes it (~1 min)
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health/live
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9       # the version the model was trained and tested with
+      - key: APP_ENVIRONMENT
+        value: production
+      - key: APP_DATABASE_URL
+        fromDatabase:
+          name: crypto-predictions-db
+          property: connectionString
+      - key: APP_CORS_ORIGINS
+        sync: false         # you enter this when the Blueprint is created, e.g. ["https://your-app.vercel.app"]
