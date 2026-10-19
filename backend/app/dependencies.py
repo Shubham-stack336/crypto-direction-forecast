@@ -10,6 +10,7 @@ from app.controllers.model_controller import ModelController
 from app.controllers.prediction_controller import PredictionController
 from app.core.config import Settings, get_settings
 from app.repositories.database import create_db_engine, create_session_factory
+from app.repositories.candle_repository import PostgresCandleRepository
 from app.repositories.history_repository import HistoryRepository, PostgresHistoryRepository
 from app.repositories.market_repository import CcxtMarketRepository, MarketRepository
 from app.repositories.model_repository import FileModelRepository
@@ -53,6 +54,14 @@ def get_history_repository() -> HistoryRepository | None:
     return PostgresHistoryRepository(create_session_factory(engine))
 
 
+@lru_cache
+def get_candle_repository() -> PostgresCandleRepository | None:
+    engine = get_db_engine()
+    if engine is None:
+        return None
+    return PostgresCandleRepository(create_session_factory(engine))
+
+
 def dispose_db_engine() -> None:
     if get_db_engine.cache_info().currsize:
         engine = get_db_engine()
@@ -64,6 +73,7 @@ def get_prediction_service(
     market_repo: MarketRepository = Depends(get_market_repository),
     model_repo: FileModelRepository = Depends(get_model_repository),
     history_repo: HistoryRepository | None = Depends(get_history_repository),
+    candle_repo: PostgresCandleRepository | None = Depends(get_candle_repository),
     settings: Settings = Depends(get_settings),
 ) -> PredictionService:
     return PredictionService(
@@ -72,6 +82,7 @@ def get_prediction_service(
         candles_limit=settings.market_candles_limit,
         max_staleness_candles=settings.max_staleness_candles,
         history_repo=history_repo,
+        candle_repo=candle_repo,
     )
 
 

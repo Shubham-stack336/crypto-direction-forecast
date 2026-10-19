@@ -72,3 +72,20 @@ class ModelVersionRecord(Base):
     registered_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class MarketCandleRecord(Base):
+    __tablename__ = "market_candles"
+
+
+    symbol: Mapped[str] = mapped_column(String(20), primary_key=True)
+    timeframe: Mapped[str] = mapped_column(String(10), primary_key=True)
+    candle_time_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    open: Mapped[float] = mapped_column(Float, nullable=False)
+    high: Mapped[float] = mapped_column(Float, nullable=False)
+    low: Mapped[float] = mapped_column(Float, nullable=False)
+    close: Mapped[float] = mapped_column(Float, nullable=False)
+    volume: Mapped[float] = mapped_column(Float, nullable=False)
+    saved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

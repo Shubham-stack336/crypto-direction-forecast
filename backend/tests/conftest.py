@@ -14,11 +14,12 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sqlalchemy import text
 
-from app.dependencies import get_history_repository, get_market_repository, get_model_repository
+from app.dependencies import get_candle_repository, get_history_repository, get_market_repository, get_model_repository
 from app.main import create_app
 from app.ml.features import FEATURE_COLUMNS, make_features
 from app.ml.inference import DISCLAIMER, Prediction, PredictionEngine
 from app.repositories.database import create_db_engine, create_session_factory
+from app.repositories.candle_repository import PostgresCandleRepository
 from app.repositories.history_repository import PostgresHistoryRepository
 from app.repositories.model_repository import FileModelRepository
 
@@ -173,7 +174,7 @@ def pg_server_url(tmp_path_factory):
 def db_engine(pg_server_url):
     engine = create_db_engine(pg_server_url, connect_timeout_s=3, statement_timeout_ms=5000, pool_size=2)
     with engine.begin() as connection:
-        connection.execute(text("TRUNCATE predictions, model_versions RESTART IDENTITY"))
+        connection.execute(text("TRUNCATE predictions, model_versions, market_candles RESTART IDENTITY"))
     yield engine
     engine.dispose()
 
@@ -181,6 +182,11 @@ def db_engine(pg_server_url):
 @pytest.fixture
 def history_repo(db_engine):
     return PostgresHistoryRepository(create_session_factory(db_engine))
+
+
+@pytest.fixture
+def candle_repo(db_engine):
+    return PostgresCandleRepository(create_session_factory(db_engine))
 
 
 @pytest.fixture
@@ -193,12 +199,13 @@ def dead_history_repo():
 
 @pytest.fixture
 def make_client(model_dir):
-    def _make(market_repo, directory=None, history_repo=None):
+    def _make(market_repo, directory=None, history_repo=None, candle_repo=None):
         app = create_app()
         model_repo = FileModelRepository(directory or model_dir, max_staleness_candles=3)
         app.dependency_overrides[get_market_repository] = lambda: market_repo
         app.dependency_overrides[get_model_repository] = lambda: model_repo
         app.dependency_overrides[get_history_repository] = lambda: history_repo
+        app.dependency_overrides[get_candle_repository] = lambda: candle_repo
         return TestClient(app, raise_server_exceptions=False)
 
     return _make

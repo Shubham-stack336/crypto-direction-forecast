@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Path
 from app.controllers.market_controller import MarketController
 from app.core.symbols import SYMBOL_PATH_PATTERN
 from app.dependencies import get_market_controller
-from app.schemas.responses import ErrorResponse, MarketResponse
+from app.schemas.responses import ErrorResponse, MarketResponse, SavedCandlesResponse
 
 router = APIRouter(prefix="/api/v1/market", tags=["market"])
 
@@ -21,3 +21,16 @@ def get_market(
     controller: MarketController = Depends(get_market_controller),
 ):
     return controller.get_market(symbol, timeframe)
+
+
+@router.get(
+    "/{symbol}/saved",
+    response_model=SavedCandlesResponse,
+    responses={404: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+)
+def get_saved_candles(
+    symbol: str = Path(pattern=SYMBOL_PATH_PATTERN, description="e.g. BTC-USDT"),
+    timeframe: Literal["1h"] = "1h",
+    controller: MarketController = Depends(get_market_controller),
+):
+    return controller.get_saved_candles(symbol, timeframe)

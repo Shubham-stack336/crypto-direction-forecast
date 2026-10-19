@@ -74,6 +74,12 @@ class MarketResponse(BaseModel):
     candles: list[CandleOut]
 
 
+class SavedCandlesResponse(BaseModel):
+    symbol: str
+    timeframe: str
+    candles: list[CandleOut]
+
+
 class ModelStatusResponse(BaseModel):
     symbol: str
     timeframe: str

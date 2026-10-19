@@ -59,7 +59,8 @@ npm run build
 | GET | `/health/live` | process is up |
 | GET | `/health/ready` | a model is loaded and, if configured, the database answers |
 | GET | `/api/v1/market/{symbol}` | latest closed candles and data freshness (`BTC-USDT`) |
-| POST | `/api/v1/predictions/{symbol}` | run the model on live candles, save to history |
+| GET | `/api/v1/market/{symbol}/saved` | the last 3 closed candles saved in the database (needs a database) |
+| POST | `/api/v1/predictions/{symbol}` | run the model on live candles, save to history and save the last 3 closed candles |
 | GET | `/api/v1/predictions/{symbol}/history?limit=&offset=` | saved forecasts, newest first |
 | GET | `/api/v1/models/{symbol}/status` | model metadata and saved evaluation metrics |
 

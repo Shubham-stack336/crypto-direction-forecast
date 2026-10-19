@@ -16,7 +16,7 @@ def test_upgrade_downgrade_upgrade_on_a_fresh_database(pg_server_url):
     engine = create_engine(url)
     try:
         command.upgrade(cfg, "head")
-        assert {"predictions", "model_versions"} <= set(inspect(engine).get_table_names())
+        assert {"predictions", "model_versions", "market_candles"} <= set(inspect(engine).get_table_names())
 
         command.downgrade(cfg, "base")
         assert "predictions" not in inspect(engine).get_table_names()

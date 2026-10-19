@@ -7,6 +7,7 @@ import pandas as pd
 
 from app.ml.inference import InvalidInputError, Prediction
 from app.ml.validation import validate
+from app.repositories.candle_repository import PostgresCandleRepository
 from app.repositories.history_repository import (
     HistoryNotConfiguredError,
     HistoryRepository,
@@ -19,6 +20,7 @@ from app.repositories.model_repository import FileModelRepository
 logger = logging.getLogger(__name__)
 
 SNAPSHOT_CANDLES = 24
+SAVED_CANDLES = 3
 
 
 @dataclass(frozen=True)
@@ -53,6 +55,13 @@ class MarketSnapshot:
 
 
 @dataclass(frozen=True)
+class SavedCandles:
+    symbol: str
+    timeframe: str
+    candles: list[dict]
+
+
+@dataclass(frozen=True)
 class ModelStatus:
     symbol: str
     timeframe: str
@@ -75,10 +84,12 @@ class PredictionService:
         candles_limit: int,
         max_staleness_candles: int,
         history_repo: HistoryRepository | None = None,
+        candle_repo: PostgresCandleRepository | None = None,
     ):
         self._market = market_repo
         self._models = model_repo
         self._history = history_repo
+        self._candles = candle_repo
         self._limit = candles_limit
         self._max_staleness = max_staleness_candles
 
@@ -86,6 +97,7 @@ class PredictionService:
         engine = self._models.get_engine(symbol, timeframe)
         candles = self._market.fetch_candles(symbol, timeframe, self._limit)
         prediction = engine.predict(candles)
+        self._save_candles(candles, symbol, timeframe)
         return PredictionOutcome(prediction, self._save(prediction, engine, symbol, timeframe))
 
     def _save(self, prediction: Prediction, engine, symbol: str, timeframe: str) -> bool:
@@ -104,6 +116,44 @@ class PredictionService:
             logger.warning("prediction saved but model version could not be registered")
         return True
 
+    def _save_candles(self, raw: pd.DataFrame, symbol: str, timeframe: str) -> None:
+        """Keep the last closed candles. A storage failure must not hide a valid prediction."""
+        if self._candles is None:
+            return
+        try:
+            closed = self._closed_candles(raw, timeframe, datetime.now(timezone.utc))
+            self._candles.save(symbol, timeframe, self._rows(closed.tail(SAVED_CANDLES)))
+        except (HistoryStorageError, InvalidInputError):
+            logger.warning("latest candles could not be saved")
+
+    def saved_candles(self, symbol: str, timeframe: str) -> SavedCandles:
+        if self._candles is None:
+            raise HistoryNotConfiguredError("no database configured")
+        return SavedCandles(symbol, timeframe, self._candles.latest(symbol, timeframe, SAVED_CANDLES))
+
+    @staticmethod
+    def _closed_candles(raw: pd.DataFrame, timeframe: str, now: datetime) -> pd.DataFrame:
+        df, problems = validate(raw.assign(timestamp=pd.to_datetime(raw["timestamp"], utc=True)))
+        if problems:
+            raise InvalidInputError("; ".join(problems))
+        if df["timestamp"].iloc[-1] + pd.Timedelta(timeframe) > now:
+            df = df.iloc[:-1]
+        return df
+
+    @staticmethod
+    def _rows(df: pd.DataFrame) -> list[dict]:
+        return [
+            {
+                "timestamp": row.timestamp.isoformat(),
+                "open": float(row.open),
+                "high": float(row.high),
+                "low": float(row.low),
+                "close": float(row.close),
+                "volume": float(row.volume),
+            }
+            for row in df.itertuples()
+        ]
+
     def history(self, symbol: str, timeframe: str, limit: int, offset: int) -> HistoryPage:
         if self._history is None:
             raise HistoryNotConfiguredError("no database configured")
@@ -113,13 +163,8 @@ class PredictionService:
     def market_snapshot(self, symbol: str, timeframe: str, now: datetime | None = None) -> MarketSnapshot:
         now = now or datetime.now(timezone.utc)
         raw = self._market.fetch_candles(symbol, timeframe, self._limit)
-        df, problems = validate(raw.assign(timestamp=pd.to_datetime(raw["timestamp"], utc=True)))
-        if problems:
-            raise InvalidInputError("; ".join(problems))
-
+        df = self._closed_candles(raw, timeframe, now)
         candle_length = pd.Timedelta(timeframe)
-        if df["timestamp"].iloc[-1] + candle_length > now:
-            df = df.iloc[:-1]
 
         latest = df.iloc[-1]
         age = now - (latest["timestamp"] + candle_length)
@@ -131,17 +176,7 @@ class PredictionService:
             last_close=float(latest["close"]),
             data_age_minutes=round(age.total_seconds() / 60, 1),
             is_fresh=age <= self._max_staleness * candle_length,
-            candles=[
-                {
-                    "timestamp": row.timestamp.isoformat(),
-                    "open": float(row.open),
-                    "high": float(row.high),
-                    "low": float(row.low),
-                    "close": float(row.close),
-                    "volume": float(row.volume),
-                }
-                for row in recent.itertuples()
-            ],
+            candles=self._rows(recent),
         )
 
     def model_status(self, symbol: str, timeframe: str) -> ModelStatus:
