@@ -1,13 +1,12 @@
-"""PostgreSQL persistence for the most recent closed market candles."""
+"""Database persistence for the most recent closed market candles."""
 import logging
 from datetime import datetime
 
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.repositories.database import session_scope
+from app.repositories.database import dialect_insert, session_scope
 from app.repositories.history_repository import HistoryStorageError
 from app.repositories.orm import MarketCandleRecord
 
@@ -32,14 +31,15 @@ class PostgresCandleRepository:
             }
             for c in candles
         ]
-        statement = insert(MarketCandleRecord).values(rows)
-        statement = statement.on_conflict_do_update(
-            index_elements=["symbol", "timeframe", "candle_time_utc"],
-            set_={name: statement.excluded[name] for name in PRICE_COLUMNS},
-        )
         try:
             with session_scope(self._factory) as session:
-                session.execute(statement)
+                statement = dialect_insert(session, MarketCandleRecord).values(rows)
+                session.execute(
+                    statement.on_conflict_do_update(
+                        index_elements=["symbol", "timeframe", "candle_time_utc"],
+                        set_={name: statement.excluded[name] for name in PRICE_COLUMNS},
+                    )
+                )
         except SQLAlchemyError as err:
             logger.warning("could not save candles: %s", type(err).__name__)
             raise HistoryStorageError("could not save candles") from err

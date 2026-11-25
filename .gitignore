@@ -1,5 +1,6 @@
 # Python
 .venv/
+venv/
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -18,3 +19,9 @@ ml_engine/data/return_hist.png
 # OS / editor
 .DS_Store
 Thumbs.db
+
+# Local only
+.vscode/
+backend/backup_synthetic_*/
+backend/data/raw/
+backend/data/processed/

@@ -5,13 +5,19 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parents[2]
+SQLITE_PREFIX = "sqlite:///"
 
 
 def normalize_database_url(url: str) -> str:
-    """Accept postgres:// and postgresql:// (as hosting providers hand out) and force psycopg 3."""
+    """Accept postgres:// and postgresql:// (as hosting providers hand out) and force psycopg 3; resolve SQLite paths."""
     for prefix in ("postgres://", "postgresql://"):
         if url.startswith(prefix):
             return "postgresql+psycopg://" + url[len(prefix):]
+    if url.startswith(SQLITE_PREFIX):
+        path = url[len(SQLITE_PREFIX):]
+        # Anchor relative files to backend/, so the same file is used from any working directory.
+        if path and path != ":memory:" and not Path(path).is_absolute():
+            return SQLITE_PREFIX + (BASE_DIR / path).as_posix()
     return url
 
 
@@ -57,6 +63,8 @@ class Settings(BaseSettings):
     def production_requires_database(self) -> "Settings":
         if self.environment == "production" and not self.database_url:
             raise ValueError("APP_DATABASE_URL is required when APP_ENVIRONMENT=production")
+        if self.environment == "production" and self.database_url.startswith("sqlite"):
+            raise ValueError("SQLite is for local development only; use PostgreSQL in production")
         return self
 
     @property

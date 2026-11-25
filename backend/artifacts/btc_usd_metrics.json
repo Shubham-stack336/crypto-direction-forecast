@@ -1,0 +1,65 @@
+{
+  "symbol": "BTC-USD",
+  "trained_at_utc": "2026-11-24T03:21:49.794931+00:00",
+  "candidate_model": "random_forest",
+  "beats_baseline": true,
+  "edge_over_baseline_acc": -0.0166,
+  "edge_over_baseline_bal_acc": 0.0016,
+  "honest_assessment": "Candidate (random_forest) slightly beat naive baseline by +0.2%. Edge is narrow; market exhibits heavy random-walk behavior.",
+  "train_samples": 1436,
+  "test_samples": 360,
+  "test_period": [
+    "2025-11-28",
+    "2026-11-22"
+  ],
+  "results": {
+    "naive_baseline": {
+      "accuracy": 0.5222,
+      "balanced_accuracy": 0.5,
+      "macro_f1": 0.3431,
+      "precision": 0.0,
+      "recall": 0.0,
+      "up_accuracy": 0.0,
+      "down_accuracy": 1.0
+    },
+    "logistic_regression": {
+      "accuracy": 0.4917,
+      "balanced_accuracy": 0.4881,
+      "macro_f1": 0.4862,
+      "precision": 0.4636,
+      "recall": 0.407,
+      "up_accuracy": 0.407,
+      "down_accuracy": 0.5691
+    },
+    "random_forest": {
+      "accuracy": 0.5056,
+      "balanced_accuracy": 0.5016,
+      "macro_f1": 0.4994,
+      "precision": 0.4797,
+      "recall": 0.4128,
+      "up_accuracy": 0.4128,
+      "down_accuracy": 0.5904
+    },
+    "gradient_boosting": {
+      "accuracy": 0.4861,
+      "balanced_accuracy": 0.4862,
+      "macro_f1": 0.4859,
+      "precision": 0.4641,
+      "recall": 0.4884,
+      "up_accuracy": 0.4884,
+      "down_accuracy": 0.484
+    }
+  },
+  "feature_names": [
+    "return_1d",
+    "return_3d",
+    "return_7d",
+    "sma_7_ratio",
+    "sma_14_ratio",
+    "sma_30_ratio",
+    "rsi_14",
+    "volatility_7d",
+    "volatility_14d",
+    "volume_ratio_7d"
+  ]
+}

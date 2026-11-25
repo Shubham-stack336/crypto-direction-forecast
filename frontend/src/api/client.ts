@@ -1,4 +1,4 @@
-import type { HistoryPage, MarketData, ModelStatus, PredictionResult, Readiness } from "./types";
+import type { Coin, HistoryPage, MarketData, ModelStatus, PredictionResult, Readiness, ScanRow, TrackRecord } from "./types";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:8000";
 // A free hosting plan can need about a minute to wake a sleeping server on the first request.
@@ -77,6 +77,14 @@ export const getReady = (signal?: AbortSignal) => request<Readiness>("/health/re
 
 export const getMarket = (symbol: string, signal?: AbortSignal) =>
   request<MarketData>(`/api/v1/market/${encodeURIComponent(symbol)}`, { signal });
+
+export const getCoins = (signal?: AbortSignal) =>
+  request<{ items: Coin[] }>("/api/v1/coins", { signal }).then((r) => r.items);
+
+export const scanMarket = (limit = 12) => request<{ items: ScanRow[] }>(`/api/v1/coins/scan?limit=${limit}`);
+
+export const getTrackRecord = (symbol: string, signal?: AbortSignal) =>
+  request<TrackRecord>(`/api/v1/predictions/${encodeURIComponent(symbol)}/track-record`, { signal });
 
 export const getModelStatus = (symbol: string, signal?: AbortSignal) =>
   request<ModelStatus>(`/api/v1/models/${encodeURIComponent(symbol)}/status`, { signal });

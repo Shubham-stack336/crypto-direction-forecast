@@ -3,6 +3,7 @@ import type { AsyncState } from "../api/useAsync";
 import type { MarketData } from "../api/types";
 import { formatAge, formatPrice, formatUtc } from "../format";
 import { Card, ErrorBox, Loading } from "./StateViews";
+import { SpatialChart } from "./SpatialChart";
 
 interface Props {
   state: AsyncState<MarketData>;
@@ -16,11 +17,18 @@ export function MarketCard({ state, onRetry }: Props) {
       {state.status === "error" && <ErrorBox error={state.error as ApiError} onRetry={onRetry} />}
       {state.status === "success" && (
         <>
-          <p className="price">{formatPrice(state.data.last_close)}</p>
-          <p className="hint">last closed {state.data.timeframe} candle</p>
-          <p className={state.data.is_fresh ? "fresh fresh-yes" : "fresh fresh-no"}>
-            {state.data.is_fresh ? "● Data is fresh" : "● Data is stale"} · {formatAge(state.data.data_age_minutes)} old
-          </p>
+          <div className="market-price-row">
+            <div>
+              <p className="price">{formatPrice(state.data.last_close)}</p>
+              <p className="hint">last closed {state.data.timeframe} candle</p>
+            </div>
+            <p className={state.data.is_fresh ? "fresh fresh-yes" : "fresh fresh-no"}>
+              {state.data.is_fresh ? "● Data is fresh" : "● Data is stale"} · {formatAge(state.data.data_age_minutes)} old
+            </p>
+          </div>
+
+          <SpatialChart candles={state.data.candles} />
+
           <dl className="facts">
             <dt>Candle closed at</dt>
             <dd>{formatUtc(state.data.latest_closed_candle_utc)}</dd>

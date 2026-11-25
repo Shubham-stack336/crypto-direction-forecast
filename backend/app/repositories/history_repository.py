@@ -1,16 +1,15 @@
-"""PostgreSQL persistence for prediction history and model-version metadata."""
+"""Database persistence for prediction history and model-version metadata."""
 import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
 from sqlalchemy import func, select, text
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.ml.inference import Prediction
-from app.repositories.database import session_scope
+from app.repositories.database import dialect_insert, session_scope
 from app.repositories.orm import ModelVersionRecord, PredictionRecord
 
 logger = logging.getLogger(__name__)
@@ -114,23 +113,23 @@ class PostgresHistoryRepository:
             raise HistoryStorageError("could not read history") from err
 
     def register_model(self, model_version: str, metadata: dict, evaluation: dict | None) -> None:
-        statement = (
-            insert(ModelVersionRecord)
-            .values(
-                symbol=metadata["symbol"],
-                timeframe=metadata["timeframe"],
-                model_version=model_version,
-                feature_version=metadata["feature_version"],
-                horizon_candles=metadata["horizon_candles"],
-                threshold=metadata["threshold"],
-                trained_at_utc=datetime.fromisoformat(metadata["trained_at_utc"]),
-                evaluation=evaluation,
-            )
-            .on_conflict_do_nothing(constraint="uq_model_versions_identity")
-        )
+        values = {
+            "symbol": metadata["symbol"],
+            "timeframe": metadata["timeframe"],
+            "model_version": model_version,
+            "feature_version": metadata["feature_version"],
+            "horizon_candles": metadata["horizon_candles"],
+            "threshold": metadata["threshold"],
+            "trained_at_utc": datetime.fromisoformat(metadata["trained_at_utc"]),
+            "evaluation": evaluation,
+        }
         try:
             with session_scope(self._factory) as session:
-                session.execute(statement)
+                session.execute(
+                    dialect_insert(session, ModelVersionRecord)
+                    .values(**values)
+                    .on_conflict_do_nothing(index_elements=["symbol", "timeframe", "model_version"])
+                )
         except SQLAlchemyError as err:
             logger.warning("could not register model version: %s", type(err).__name__)
             raise HistoryStorageError("could not register model version") from err

@@ -1,6 +1,18 @@
 import re
 
-SYMBOL_PATH_PATTERN = r"^[A-Za-z0-9]{2,10}-[A-Za-z0-9]{2,10}$"
+SYMBOL_PATH_PATTERN = r"^[A-Za-z0-9]{1,14}-[A-Za-z0-9]{2,5}$"
+# Coins whose price is pegged to a currency: a direction forecast is meaningless for them.
+PEGGED_BASES = frozenset(
+    "USDC FDUSD TUSD USDP DAI BUSD USDE USD1 USDS PYUSD RLUSD XUSD BFUSD RWUSD U AEUR EURI EUR GBP AUD TRY BRL".split()
+)
+UNIVERSAL_SYMBOL = "ALL/USDT"
+
+
+def is_forecastable(symbol: str) -> bool:
+    base, _, quote = symbol.partition("/")
+    return quote == "USDT" and base not in PEGGED_BASES and symbol != UNIVERSAL_SYMBOL
+
+
 _SYMBOL_RE = re.compile(SYMBOL_PATH_PATTERN)
 
 

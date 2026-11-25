@@ -92,7 +92,52 @@ class ModelStatusResponse(BaseModel):
     trained_at_utc: str
     train_period: list[str]
     evaluation: dict | None
+    model_kind: Literal["dedicated", "universal"]
     disclaimer: str
+
+
+class CoinOut(BaseModel):
+    symbol: str
+    last: float
+    change_pct: float
+    quote_volume: float
+    model: Literal["dedicated", "universal"]
+
+
+class CoinsResponse(BaseModel):
+    items: list[CoinOut]
+
+
+class ScanRowOut(BaseModel):
+    symbol: str
+    last: float
+    change_pct: float
+    label: Literal["UP", "DOWN", "SIDEWAYS"]
+    probabilities: dict[str, float]
+    model: Literal["dedicated", "universal"]
+
+
+class ScanResponse(BaseModel):
+    items: list[ScanRowOut]
+    disclaimer: str
+
+
+class CheckedForecastOut(BaseModel):
+    id: int
+    latest_candle_utc: str
+    label: Literal["UP", "DOWN", "SIDEWAYS"]
+    actual: Literal["UP", "DOWN", "SIDEWAYS"]
+    return_pct: float
+    correct: bool
+
+
+class TrackRecordResponse(BaseModel):
+    symbol: str
+    checked: int
+    correct: int
+    pending: int
+    not_checkable: int
+    items: list[CheckedForecastOut]
 
 
 class ErrorResponse(BaseModel):

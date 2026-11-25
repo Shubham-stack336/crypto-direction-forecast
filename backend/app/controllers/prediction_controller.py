@@ -1,7 +1,7 @@
 from dataclasses import asdict
 
 from app.controllers.errors import parse_symbol, run_service
-from app.schemas.responses import HistoryItem, HistoryResponse, PredictionResponse
+from app.schemas.responses import HistoryItem, HistoryResponse, PredictionResponse, TrackRecordResponse
 from app.services.prediction_service import PredictionService
 
 
@@ -13,6 +13,10 @@ class PredictionController:
         symbol = parse_symbol(symbol_slug)
         outcome = run_service(lambda: self._service.predict(symbol, timeframe))
         return PredictionResponse(**asdict(outcome.prediction), saved=outcome.saved)
+
+    def get_track_record(self, symbol_slug: str, timeframe: str) -> TrackRecordResponse:
+        symbol = parse_symbol(symbol_slug)
+        return TrackRecordResponse(**asdict(run_service(lambda: self._service.track_record(symbol, timeframe))))
 
     def get_history(self, symbol_slug: str, timeframe: str, limit: int, offset: int) -> HistoryResponse:
         symbol = parse_symbol(symbol_slug)

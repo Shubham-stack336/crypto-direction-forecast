@@ -2,39 +2,37 @@ import { slugToSymbol } from "../format";
 
 interface Props {
   symbols: string[];
+  watchlist: string[];
   symbol: string;
   onSymbolChange: (symbol: string) => void;
+  onToggleWatch: (symbol: string) => void;
   horizonCandles: number | null;
 }
 
-export function Controls({ symbols, symbol, onSymbolChange, horizonCandles }: Props) {
+export function Controls({ symbols, watchlist, symbol, onSymbolChange, onToggleWatch, horizonCandles }: Props) {
+  const watched = watchlist.includes(symbol);
+  const option = (entry: string) => (
+    <option key={entry} value={entry}>
+      {slugToSymbol(entry)}
+    </option>
+  );
+  const others = symbols.filter((entry) => !watchlist.includes(entry));
   return (
     <div className="controls">
       <label>
         Cryptocurrency
         <select value={symbol} onChange={(event) => onSymbolChange(event.target.value)}>
-          {symbols.map((entry) => (
-            <option key={entry} value={entry}>
-              {slugToSymbol(entry)}
-            </option>
-          ))}
+          {watchlist.length > 0 && <optgroup label="Watchlist">{watchlist.map(option)}</optgroup>}
+          <optgroup label="All coins">{others.map(option)}</optgroup>
         </select>
       </label>
-
-      <label>
-        Timeframe
-        <select value="1h" disabled aria-describedby="timeframe-note">
-          <option value="1h">1 hour candles</option>
-        </select>
-      </label>
-
+      <button type="button" className="button secondary" aria-pressed={watched} onClick={() => onToggleWatch(symbol)}>
+        {watched ? "★ In watchlist" : "☆ Add to watchlist"}
+      </button>
       <div className="control-fact">
         <span className="label">Forecast horizon</span>
         <span>{horizonCandles === null ? "…" : `${horizonCandles} candles (${horizonCandles} hours ahead)`}</span>
       </div>
-      <p id="timeframe-note" className="hint">
-        Only models that have been trained and evaluated are offered.
-      </p>
     </div>
   );
 }

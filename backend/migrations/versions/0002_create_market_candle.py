@@ -30,7 +30,7 @@ def upgrade() -> None:
     sa.Column('low', sa.Float(), nullable=False),
     sa.Column('close', sa.Float(), nullable=False),
     sa.Column('volume', sa.Float(), nullable=False),
-    sa.Column('saved_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('saved_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     sa.PrimaryKeyConstraint('symbol', 'timeframe', 'candle_time_utc')
     )
 

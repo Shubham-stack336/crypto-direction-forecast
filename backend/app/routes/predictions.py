@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Path, Query
 from app.controllers.prediction_controller import PredictionController
 from app.core.symbols import SYMBOL_PATH_PATTERN
 from app.dependencies import get_prediction_controller
-from app.schemas.responses import ErrorResponse, HistoryResponse, PredictionRequest, PredictionResponse
+from app.schemas.responses import ErrorResponse, HistoryResponse, PredictionRequest, PredictionResponse, TrackRecordResponse
 
 router = APIRouter(prefix="/api/v1/predictions", tags=["predictions"])
 
@@ -22,6 +22,19 @@ def create_prediction(
 ):
     request = body or PredictionRequest()
     return controller.create_prediction(symbol, request.timeframe)
+
+
+@router.get(
+    "/{symbol}/track-record",
+    response_model=TrackRecordResponse,
+    responses={404: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+)
+def get_track_record(
+    symbol: str = Path(pattern=SYMBOL_PATH_PATTERN, description="e.g. BTC-USDT"),
+    timeframe: Literal["1h"] = "1h",
+    controller: PredictionController = Depends(get_prediction_controller),
+):
+    return controller.get_track_record(symbol, timeframe)
 
 
 @router.get(

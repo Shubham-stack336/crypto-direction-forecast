@@ -1,12 +1,21 @@
 import type { AsyncState } from "../api/useAsync";
 import type { HistoryPage } from "../api/types";
-import { formatPercent, formatUtc } from "../format";
+import { formatPercent, formatUtc, historyToCsv } from "../format";
 import { DirectionBadge } from "./DirectionBadge";
 import { Card, Empty, ErrorBox, Loading } from "./StateViews";
 
 interface Props {
   state: AsyncState<HistoryPage>;
   onRetry: () => void;
+}
+
+function download(page: HistoryPage) {
+  const url = URL.createObjectURL(new Blob([historyToCsv(page.items)], { type: "text/csv" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `forecasts-${page.items[0].symbol.replace("/", "-")}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 export function HistoryTable({ state, onRetry }: Props) {
@@ -22,6 +31,9 @@ export function HistoryTable({ state, onRetry }: Props) {
           <p className="hint">
             Showing the latest {state.data.items.length} of {state.data.total}.
           </p>
+          <button type="button" className="button secondary" onClick={() => download(state.data)}>
+            Download CSV
+          </button>
           <div className="table-wrap">
             <table>
               <caption className="sr-only">Saved forecasts, newest first</caption>

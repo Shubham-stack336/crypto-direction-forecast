@@ -1,7 +1,8 @@
-"""SQLAlchemy table definitions (PostgreSQL)."""
-from datetime import datetime
+"""SQLAlchemy table definitions (PostgreSQL; SQLite for local development)."""
+from datetime import datetime, timezone
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     CheckConstraint,
     DateTime,
@@ -10,6 +11,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    TypeDecorator,
     UniqueConstraint,
     func,
 )
@@ -17,6 +19,25 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.repositories.database import Base
+
+# SQLite only auto-generates ids for INTEGER primary keys and has no JSONB type.
+BigId = BigInteger().with_variant(Integer(), "sqlite")
+JsonDoc = JSONB().with_variant(JSON(), "sqlite")
+
+
+class UtcDateTime(TypeDecorator):
+    """Timezone-aware UTC. SQLite drops the timezone, so convert on write and restore it on read."""
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        return value.astimezone(timezone.utc) if value is not None else None
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
 
 
 class PredictionRecord(Base):
@@ -36,7 +57,7 @@ class PredictionRecord(Base):
         ),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    id: Mapped[int] = mapped_column(BigId, Identity(), primary_key=True)
     symbol: Mapped[str] = mapped_column(String(20), nullable=False)
     timeframe: Mapped[str] = mapped_column(String(10), nullable=False)
     horizon_candles: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -44,13 +65,13 @@ class PredictionRecord(Base):
     prob_up: Mapped[float] = mapped_column(Float, nullable=False)
     prob_down: Mapped[float] = mapped_column(Float, nullable=False)
     prob_sideways: Mapped[float] = mapped_column(Float, nullable=False)
-    prediction_time_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    latest_candle_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    prediction_time_utc: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    latest_candle_utc: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     model_version: Mapped[str] = mapped_column(String(50), nullable=False)
     feature_version: Mapped[str] = mapped_column(String(20), nullable=False)
-    data_quality: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    data_quality: Mapped[dict] = mapped_column(JsonDoc, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
+        UtcDateTime, nullable=False, server_default=func.now()
     )
 
 
@@ -60,17 +81,17 @@ class ModelVersionRecord(Base):
         UniqueConstraint("symbol", "timeframe", "model_version", name="uq_model_versions_identity"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    id: Mapped[int] = mapped_column(BigId, Identity(), primary_key=True)
     symbol: Mapped[str] = mapped_column(String(20), nullable=False)
     timeframe: Mapped[str] = mapped_column(String(10), nullable=False)
     model_version: Mapped[str] = mapped_column(String(50), nullable=False)
     feature_version: Mapped[str] = mapped_column(String(20), nullable=False)
     horizon_candles: Mapped[int] = mapped_column(Integer, nullable=False)
     threshold: Mapped[float] = mapped_column(Float, nullable=False)
-    trained_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    evaluation: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    trained_at_utc: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    evaluation: Mapped[dict | None] = mapped_column(JsonDoc, nullable=True)
     registered_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
+        UtcDateTime, nullable=False, server_default=func.now()
     )
 
 
@@ -80,12 +101,12 @@ class MarketCandleRecord(Base):
 
     symbol: Mapped[str] = mapped_column(String(20), primary_key=True)
     timeframe: Mapped[str] = mapped_column(String(10), primary_key=True)
-    candle_time_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    candle_time_utc: Mapped[datetime] = mapped_column(UtcDateTime, primary_key=True)
     open: Mapped[float] = mapped_column(Float, nullable=False)
     high: Mapped[float] = mapped_column(Float, nullable=False)
     low: Mapped[float] = mapped_column(Float, nullable=False)
     close: Mapped[float] = mapped_column(Float, nullable=False)
     volume: Mapped[float] = mapped_column(Float, nullable=False)
     saved_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
+        UtcDateTime, nullable=False, server_default=func.now()
     )

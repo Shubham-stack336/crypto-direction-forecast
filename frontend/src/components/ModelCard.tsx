@@ -29,6 +29,8 @@ function ModelDetails({ model }: { model: ModelStatus }) {
   return (
     <>
       <dl className="facts">
+        <dt>Model</dt>
+        <dd>{model.model_kind === "universal" ? "Universal (shared by many coins)" : "Trained on this coin"}</dd>
         <dt>Version</dt>
         <dd>{model.model_version}</dd>
         <dt>Trained</dt>
@@ -45,7 +47,8 @@ function ModelDetails({ model }: { model: ModelStatus }) {
       ) : (
         <>
           <p className="hint">
-            Scores on {evaluation.test_rows.toLocaleString("en-US")} hours the model never saw during training (
+            Scores on {evaluation.test_rows.toLocaleString("en-US")} hours{" "}
+            {model.model_kind === "universal" ? "of ten coins" : ""} the model never saw during training (
             {formatUtc(evaluation.test_period[0])} to {formatUtc(evaluation.test_period[1])}). Random guessing among
             three classes scores about 33% balanced accuracy.
           </p>
@@ -76,8 +79,8 @@ function ModelDetails({ model }: { model: ModelStatus }) {
           </div>
           <p className="hint">
             Plain accuracy can look good for the naive model because SIDEWAYS is the most common outcome; balanced
-            accuracy and macro F1 are fairer. In earlier checks most of the model's edge came from sensing whether
-            the market would move, not which way.
+            accuracy and macro F1 are fairer. In earlier checks on BTC most of the model's edge came from sensing
+            whether the market would move, not which way.
           </p>
         </>
       )}

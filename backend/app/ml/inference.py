@@ -92,7 +92,9 @@ class PredictionEngine:
     @property
     def model_version(self) -> str:
         trained_day = self.metadata["trained_at_utc"][:10]
-        return f"{self.metadata['feature_version']}-{trained_day}"
+        version = f"{self.metadata['feature_version']}-{trained_day}"
+        name = self.metadata.get("model_name")
+        return f"{name}-{version}" if name else version
 
     def predict(self, candles, now=None) -> Prediction:
         now = now or datetime.now(timezone.utc)

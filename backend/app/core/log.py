@@ -22,12 +22,21 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(entry)
 
 
+class TextFormatter(logging.Formatter):
+    """Readable lines that also show which request a log entry is about."""
+
+    def formatMessage(self, record: logging.LogRecord) -> str:
+        line = super().formatMessage(record)
+        details = [f"{f}={getattr(record, f)}" for f in EXTRA_FIELDS[1:] if hasattr(record, f)]
+        return " ".join([line, *details])
+
+
 def configure_logging(json_logs: bool) -> None:
     handler = logging.StreamHandler()
     if json_logs:
         handler.setFormatter(JsonFormatter())
     else:
-        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+        handler.setFormatter(TextFormatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
     handler._app_handler = True  # lets us replace only our own handler on repeated setup
     root = logging.getLogger()
     for existing in list(root.handlers):

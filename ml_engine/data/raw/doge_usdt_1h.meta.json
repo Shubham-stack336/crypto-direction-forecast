@@ -1,0 +1,9 @@
+{
+  "source": "binance via ccxt",
+  "symbol": "DOGE/USDT",
+  "timeframe": "1h",
+  "rows": 17519,
+  "first_candle_utc": "2024-11-24 10:00:00+00:00",
+  "last_candle_utc": "2026-11-24 08:00:00+00:00",
+  "collected_at_utc": "2026-11-24T10:00:09.098499+00:00"
+}

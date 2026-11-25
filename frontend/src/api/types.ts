@@ -65,6 +65,32 @@ export interface HistoryPage {
   offset: number;
 }
 
+export interface Coin {
+  symbol: string;
+  last: number;
+  change_pct: number;
+  quote_volume: number;
+  model: "dedicated" | "universal";
+}
+
+export interface ScanRow {
+  symbol: string;
+  last: number;
+  change_pct: number;
+  label: Direction;
+  probabilities: Record<Direction, number>;
+  model: "dedicated" | "universal";
+}
+
+export interface TrackRecord {
+  symbol: string;
+  checked: number;
+  correct: number;
+  pending: number;
+  not_checkable: number;
+  items: { id: number; latest_candle_utc: string; label: Direction; actual: Direction; return_pct: number; correct: boolean }[];
+}
+
 export interface ModelMetrics {
   accuracy: number;
   balanced_accuracy: number;
@@ -93,5 +119,6 @@ export interface ModelStatus {
   trained_at_utc: string;
   train_period: string[];
   evaluation: Evaluation | null;
+  model_kind?: "dedicated" | "universal";
   disclaimer: string;
 }

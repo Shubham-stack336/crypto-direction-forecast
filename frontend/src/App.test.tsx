@@ -86,6 +86,30 @@ function installApi(overrides: Routes = {}) {
       saved.push(savedItem);
       return { body: prediction };
     },
+    "GET /api/v1/predictions/BTC-USDT/track-record": () => ({
+      body: {
+        symbol: "BTC/USDT", checked: 2, correct: 1, pending: 1, not_checkable: 0,
+        items: [
+          { id: 9, latest_candle_utc: "2026-01-20T01:00:00+00:00", label: "UP", actual: "DOWN", return_pct: -0.8, correct: false },
+        ],
+      },
+    }),
+    "GET /api/v1/coins": () => ({
+      body: {
+        items: [
+          { symbol: "BTC/USDT", last: 81234.5, change_pct: 1.2, quote_volume: 9e9, model: "dedicated" },
+          { symbol: "SHIB/USDT", last: 0.00001234, change_pct: -3.4, quote_volume: 1e7, model: "universal" },
+        ],
+      },
+    }),
+    "GET /api/v1/coins/scan": () => ({
+      body: {
+        disclaimer: "x",
+        items: [
+          { symbol: "SHIB/USDT", last: 0.00001234, change_pct: -3.4, label: "DOWN", probabilities: { UP: 0.2, DOWN: 0.5, SIDEWAYS: 0.3 }, model: "universal" },
+        ],
+      },
+    }),
     ...overrides,
   };
 
@@ -155,6 +179,31 @@ describe("App", () => {
 
     const historyCard = region("Prediction history");
     expect(await within(historyCard).findByText(/Showing the latest 1 of 1/)).toBeInTheDocument();
+  });
+
+  it("searches coins, keeps a watchlist and opens a coin", async () => {
+    localStorage.clear();
+    const user = userEvent.setup();
+    installApi();
+    render(<App />);
+    const explorer = region("Coin explorer");
+    await user.type(await within(explorer).findByLabelText("Search coins"), "shi");
+    expect(within(explorer).getByText("0.00001234")).toBeInTheDocument();
+    expect(within(explorer).queryByLabelText("Open BTC")).toBeNull();
+    await user.click(within(explorer).getByRole("button", { name: "Watch SHIB" }));
+    expect(JSON.parse(localStorage.getItem("watchlist")!)).toEqual(["SHIB-USDT"]);
+    await user.click(within(explorer).getByRole("button", { name: "Open SHIB" }));
+    expect(screen.getByRole("button", { name: /Get forecast for SHIB\/USDT/ })).toBeInTheDocument();
+  });
+
+  it("scans only on request and shows the track record", async () => {
+    const user = userEvent.setup();
+    const fetchMock = installApi();
+    render(<App />);
+    expect(await within(region("Track record")).findByText(/1 of 2 saved forecasts were right/)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([u]) => String(u).includes("/scan"))).toBe(false);
+    await user.click(screen.getByRole("button", { name: "Scan 12 coins" }));
+    expect(await within(region("Market scanner")).findByText("50.0%")).toBeInTheDocument();
   });
 
   it("does not run a forecast until the user asks for one", async () => {

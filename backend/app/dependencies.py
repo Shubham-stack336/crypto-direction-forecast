@@ -4,6 +4,7 @@ from functools import lru_cache
 from fastapi import Depends
 from sqlalchemy import Engine
 
+from app.controllers.coin_controller import CoinController
 from app.controllers.health_controller import HealthController
 from app.controllers.market_controller import MarketController
 from app.controllers.model_controller import ModelController
@@ -88,6 +89,10 @@ def get_prediction_service(
 
 def get_health_controller(service: PredictionService = Depends(get_prediction_service)) -> HealthController:
     return HealthController(service)
+
+
+def get_coin_controller(service: PredictionService = Depends(get_prediction_service)) -> CoinController:
+    return CoinController(service)
 
 
 def get_market_controller(service: PredictionService = Depends(get_prediction_service)) -> MarketController:

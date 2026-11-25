@@ -4,6 +4,7 @@ import logging
 import threading
 from pathlib import Path
 
+from app.core.symbols import UNIVERSAL_SYMBOL, is_forecastable
 from app.ml.inference import (
     IncompatibleModelError,
     ModelNotFoundError,
@@ -37,10 +38,19 @@ class FileModelRepository:
             return engine
 
     def get_engine(self, symbol: str, timeframe: str) -> PredictionEngine:
-        return self._load(self._model_path(symbol, timeframe))
+        return self._load(self._model_path(self.model_symbol(symbol, timeframe), timeframe))
+
+    def model_symbol(self, symbol: str, timeframe: str) -> str:
+        """The symbol whose artifact serves this coin: its own model, or the universal one."""
+        if self._model_path(symbol, timeframe).exists() or not is_forecastable(symbol):
+            return symbol
+        if self._model_path(UNIVERSAL_SYMBOL, timeframe).exists():
+            return UNIVERSAL_SYMBOL
+        return symbol
 
     def get_metrics(self, symbol: str, timeframe: str) -> dict | None:
-        path = self._dir / f"{artifact_stem(symbol, timeframe)}.metrics.json"
+        stem = artifact_stem(self.model_symbol(symbol, timeframe), timeframe)
+        path = self._dir / f"{stem}.metrics.json"
         if not path.exists():
             return None
         try:

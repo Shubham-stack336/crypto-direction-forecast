@@ -21,6 +21,7 @@ from app.ml.inference import DISCLAIMER, Prediction, PredictionEngine
 from app.repositories.database import create_db_engine, create_session_factory
 from app.repositories.candle_repository import PostgresCandleRepository
 from app.repositories.history_repository import PostgresHistoryRepository
+from app.repositories.market_repository import Ticker
 from app.repositories.model_repository import FileModelRepository
 
 LAST_CLOSED = pd.Timestamp("2026-01-20 00:00", tz="UTC")
@@ -103,6 +104,11 @@ class FakeMarketRepository:
         if self.error is not None:
             raise self.error
         return self.candles.copy()
+
+    def list_tickers(self):
+        if self.error is not None:
+            raise self.error
+        return [Ticker("BTC/USDT", 100.0, 1.5, 9e6), Ticker("XYZ/USDT", 0.00001, -2.0, 1e6)]
 
 
 @pytest.fixture

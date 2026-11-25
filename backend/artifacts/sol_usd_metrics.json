@@ -1,0 +1,65 @@
+{
+  "symbol": "SOL-USD",
+  "trained_at_utc": "2026-11-24T03:39:07.300034+00:00",
+  "candidate_model": "logistic_regression",
+  "beats_baseline": true,
+  "edge_over_baseline_acc": 0.0028,
+  "edge_over_baseline_bal_acc": 0.0118,
+  "honest_assessment": "Candidate (logistic_regression) slightly beat naive baseline by +1.2%. Edge is narrow; market exhibits heavy random-walk behavior.",
+  "train_samples": 1436,
+  "test_samples": 360,
+  "test_period": [
+    "2025-11-28",
+    "2026-11-22"
+  ],
+  "results": {
+    "naive_baseline": {
+      "accuracy": 0.525,
+      "balanced_accuracy": 0.5,
+      "macro_f1": 0.3443,
+      "precision": 0.0,
+      "recall": 0.0,
+      "up_accuracy": 0.0,
+      "down_accuracy": 1.0
+    },
+    "logistic_regression": {
+      "accuracy": 0.5278,
+      "balanced_accuracy": 0.5118,
+      "macro_f1": 0.4642,
+      "precision": 0.5077,
+      "recall": 0.193,
+      "up_accuracy": 0.193,
+      "down_accuracy": 0.8307
+    },
+    "random_forest": {
+      "accuracy": 0.4944,
+      "balanced_accuracy": 0.4946,
+      "macro_f1": 0.4942,
+      "precision": 0.4696,
+      "recall": 0.4971,
+      "up_accuracy": 0.4971,
+      "down_accuracy": 0.4921
+    },
+    "gradient_boosting": {
+      "accuracy": 0.5028,
+      "balanced_accuracy": 0.5047,
+      "macro_f1": 0.5027,
+      "precision": 0.4794,
+      "recall": 0.5439,
+      "up_accuracy": 0.5439,
+      "down_accuracy": 0.4656
+    }
+  },
+  "feature_names": [
+    "return_1d",
+    "return_3d",
+    "return_7d",
+    "sma_7_ratio",
+    "sma_14_ratio",
+    "sma_30_ratio",
+    "rsi_14",
+    "volatility_7d",
+    "volatility_14d",
+    "volume_ratio_7d"
+  ]
+}
