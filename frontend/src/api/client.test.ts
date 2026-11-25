@@ -19,7 +19,7 @@ describe("api client", () => {
     const result = await getMarket("BTC-USDT");
 
     expect(result).toEqual({ symbol: "BTC/USDT" });
-    expect(String(fetchMock.mock.calls[0][0])).toMatch(//api/v1/market/BTC-USDT?hours=24$/);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/v1/market/BTC-USDT?hours=24");
   });
 
   it("sends a JSON body for predictions", async () => {
