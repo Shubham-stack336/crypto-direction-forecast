@@ -1,4 +1,4 @@
-import type { Coin, HistoryPage, MarketData, ModelStatus, PredictionResult, Readiness, ScanRow, TrackRecord } from "./types";
+import type { Coin, HistoryPage, MarketData, ModelStatus, PredictionResult, Readiness, RecordSummary, ScanRow, TrackRecord } from "./types";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:8000";
 // A free hosting plan can need about a minute to wake a sleeping server on the first request.
@@ -75,8 +75,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 export const getLive = (signal?: AbortSignal) => request<{ status: string }>("/health/live", { signal });
 export const getReady = (signal?: AbortSignal) => request<Readiness>("/health/ready", { signal });
 
-export const getMarket = (symbol: string, signal?: AbortSignal) =>
-  request<MarketData>(`/api/v1/market/${encodeURIComponent(symbol)}`, { signal });
+export const getMarket = (symbol: string, signal?: AbortSignal, hours = 24) =>
+  request<MarketData>(`/api/v1/market/${encodeURIComponent(symbol)}?hours=${hours}`, { signal });
+
+export const getRecord = (signal?: AbortSignal) => request<RecordSummary>("/api/v1/predictions", { signal });
 
 export const getCoins = (signal?: AbortSignal) =>
   request<{ items: Coin[] }>("/api/v1/coins", { signal }).then((r) => r.items);

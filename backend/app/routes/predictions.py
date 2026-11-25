@@ -5,9 +5,15 @@ from fastapi import APIRouter, Depends, Path, Query
 from app.controllers.prediction_controller import PredictionController
 from app.core.symbols import SYMBOL_PATH_PATTERN
 from app.dependencies import get_prediction_controller
-from app.schemas.responses import ErrorResponse, HistoryResponse, PredictionRequest, PredictionResponse, TrackRecordResponse
+from app.schemas.responses import ErrorResponse, HistoryResponse, PredictionRequest, PredictionResponse, RecordSummaryResponse, TrackRecordResponse
 
 router = APIRouter(prefix="/api/v1/predictions", tags=["predictions"])
+
+
+@router.get("", response_model=RecordSummaryResponse, responses={503: {"model": ErrorResponse}})
+def get_summary(controller: PredictionController = Depends(get_prediction_controller)):
+    """Every finished forecast of every coin, next to the best constant guess."""
+    return controller.get_summary()
 
 
 @router.post(

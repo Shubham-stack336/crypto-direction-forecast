@@ -25,6 +25,28 @@ export interface MarketData {
   candles: Candle[];
 }
 
+export interface Confidence {
+  level: "clear" | "weak";
+  historical_accuracy: number | null;
+  historical_rows: number;
+}
+
+export interface Tally {
+  name: string;
+  checked: number;
+  correct: number;
+}
+
+export interface RecordSummary {
+  checked: number;
+  correct: number;
+  open: number;
+  baseline_correct: number;
+  by_symbol: Tally[];
+  by_model: Tally[];
+  by_label: Tally[];
+}
+
 export interface PredictionResult {
   label: Direction;
   probabilities: Record<Direction, number>;
@@ -43,6 +65,7 @@ export interface PredictionResult {
   };
   disclaimer: string;
   saved: boolean;
+  confidence?: Confidence | null;
 }
 
 export interface HistoryItem {
@@ -74,6 +97,7 @@ export interface Coin {
 }
 
 export interface ScanRow {
+  confidence?: Confidence | null;
   symbol: string;
   last: number;
   change_pct: number;

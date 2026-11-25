@@ -33,6 +33,13 @@ class PredictionResponse(BaseModel):
     data_quality: dict
     disclaimer: str
     saved: bool
+    confidence: "Confidence | None" = None
+
+
+class Confidence(BaseModel):
+    level: Literal["clear", "weak"]
+    historical_accuracy: float | None
+    historical_rows: int
 
 
 class HistoryItem(BaseModel):
@@ -114,6 +121,7 @@ class ScanRowOut(BaseModel):
     change_pct: float
     label: Literal["UP", "DOWN", "SIDEWAYS"]
     probabilities: dict[str, float]
+    confidence: Confidence | None = None
     model: Literal["dedicated", "universal"]
 
 
@@ -138,6 +146,22 @@ class TrackRecordResponse(BaseModel):
     pending: int
     not_checkable: int
     items: list[CheckedForecastOut]
+
+
+class Tally(BaseModel):
+    name: str
+    checked: int
+    correct: int
+
+
+class RecordSummaryResponse(BaseModel):
+    checked: int
+    correct: int
+    open: int
+    baseline_correct: int
+    by_symbol: list[Tally]
+    by_model: list[Tally]
+    by_label: list[Tally]
 
 
 class ErrorResponse(BaseModel):

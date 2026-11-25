@@ -41,7 +41,11 @@ def get_market_repository() -> MarketRepository:
 @lru_cache
 def get_model_repository() -> FileModelRepository:
     settings = get_settings()
-    return FileModelRepository(settings.model_dir, settings.max_staleness_candles)
+    challenger_dir = settings.model_dir / "challenger"
+    challenger = FileModelRepository(challenger_dir, settings.max_staleness_candles) if challenger_dir.is_dir() else None
+    return FileModelRepository(
+        settings.model_dir, settings.max_staleness_candles, challenger, settings.serve_challenger
+    )
 
 
 @lru_cache
@@ -112,7 +116,13 @@ def build_background_worker() -> BackgroundWorker:
         def purge():
             history.purge_older_than(datetime.now(timezone.utc) - age)
 
-    return BackgroundWorker(get_cache_store(), service.refresh_scan, purge)
+    auto = None
+    if history is not None and settings.auto_forecast_symbols:
+
+        def auto():
+            service.auto_forecast(settings.auto_forecast_symbols)
+
+    return BackgroundWorker(get_cache_store(), service.refresh_scan, purge, auto_forecast=auto)
 
 
 def get_health_controller(service: PredictionService = Depends(get_prediction_service)) -> HealthController:

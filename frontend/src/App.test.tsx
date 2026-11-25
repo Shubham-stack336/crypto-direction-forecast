@@ -138,6 +138,7 @@ function open(path: string) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
   localStorage.clear();
 });
 
@@ -185,6 +186,72 @@ describe("App", () => {
     await user.click(screen.getByRole("link", { name: "Forecast BTC" }));
     expect(await screen.findByRole("button", { name: /Get forecast for BTC\/USDT/ })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/forecast/BTC-USDT");
+  });
+
+  it("night mode can be switched on and is remembered", async () => {
+    const user = userEvent.setup();
+    installApi();
+    open("/about");
+    await user.click(screen.getByRole("button", { name: /Theme: Match device/ }));
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(localStorage.getItem("theme")).toBe("dark");
+    await user.click(screen.getByRole("button", { name: /Theme: Night/ }));
+    expect(document.documentElement.dataset.theme).toBe("light");
+  });
+
+  it("says how reliable a weak forecast has been", async () => {
+    const user = userEvent.setup();
+    installApi({
+      "POST /api/v1/predictions/BTC-USDT": () => ({
+        body: { ...prediction, confidence: { level: "weak", historical_accuracy: 0.37, historical_rows: 633 } },
+      }),
+    });
+    open("/forecast");
+    await user.click(await screen.findByRole("button", { name: /Get forecast/ }));
+    expect(await screen.findByText(/right 37% of the time on 633 past cases.*no signal/)).toBeInTheDocument();
+  });
+
+  it("price alerts are validated, fire when reached, and can be removed", async () => {
+    const user = userEvent.setup();
+    installApi();
+    localStorage.setItem("price-alerts", JSON.stringify([
+      { id: "a", slug: "BTC-USDT", side: "above", price: 80000, firedAt: null }, { broken: true },
+    ]));
+    open("/alerts");
+    expect(await screen.findByText(/Reached/)).toBeInTheDocument();
+    await user.type(await screen.findByLabelText("Price (USDT)"), "100");
+    await user.click(screen.getByRole("button", { name: "Add alert" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(/already above 100/);
+    await user.clear(screen.getByLabelText("Price (USDT)"));
+    await user.type(screen.getByLabelText("Price (USDT)"), "99999");
+    await user.click(screen.getByRole("button", { name: "Add alert" }));
+    expect(screen.getByText("Waiting")).toBeInTheDocument();
+    await user.click(screen.getAllByRole("button", { name: "Remove alert for BTC" })[0]);
+    expect(screen.queryByText("Waiting")).toBeNull();
+  });
+
+  it("the record page compares with a constant guess", async () => {
+    installApi({
+      "GET /api/v1/predictions": () => ({
+        body: { checked: 40, correct: 18, open: 2, baseline_correct: 16, by_symbol: [{ name: "BTC/USDT", checked: 40, correct: 18 }], by_model: [], by_label: [] },
+      }),
+    });
+    open("/record");
+    expect(await within(await region("Overall")).findByText("45.0%")).toBeInTheDocument();
+    expect(screen.getByText(/would have scored 40.0%/)).toBeInTheDocument();
+  });
+
+  it("compares coins", async () => {
+    const user = userEvent.setup();
+    const candle = (close: number, i: number) => ({ timestamp: `t${i}`, open: close, high: close, low: close, close, volume: 1 });
+    const body = { ...market, candles: [100, 105, 110].map(candle) };
+    installApi({
+      "GET /api/v1/market/BTC-USDT": () => ({ body }), "GET /api/v1/market/ETH-USDT": () => ({ body }), "GET /api/v1/market/SOL-USDT": () => ({ body }),
+    });
+    open("/compare");
+    expect(await screen.findAllByText(/\+10\.00%/)).not.toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: "Remove SOL" }));
+    expect(screen.queryByRole("button", { name: "Remove SOL" })).toBeNull();
   });
 
   it("links to the author's LinkedIn and GitHub", async () => {

@@ -7,9 +7,9 @@ class MarketController:
     def __init__(self, service: PredictionService):
         self._service = service
 
-    def get_market(self, symbol_slug: str, timeframe: str) -> MarketResponse:
+    def get_market(self, symbol_slug: str, timeframe: str, hours: int = 24) -> MarketResponse:
         symbol = parse_symbol(symbol_slug)
-        snapshot = run_service(lambda: self._service.market_snapshot(symbol, timeframe))
+        snapshot = run_service(lambda: self._service.market_snapshot(symbol, timeframe, hours=hours))
         return MarketResponse(**snapshot.__dict__)
 
     def get_saved_candles(self, symbol_slug: str, timeframe: str) -> SavedCandlesResponse:

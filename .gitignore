@@ -25,3 +25,4 @@ Thumbs.db
 backend/backup_synthetic_*/
 backend/data/raw/
 backend/data/processed/
+backend/data/v2_*

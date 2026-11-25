@@ -13,6 +13,7 @@ from app.repositories.database import dialect_insert, session_scope
 from app.repositories.orm import ModelVersionRecord, PredictionRecord
 
 logger = logging.getLogger(__name__)
+SHADOW_PREFIX = "shadow-"  # forecasts of a model that is only being tested
 IDENTITY_COLUMNS = ("symbol", "timeframe", "latest_candle_utc", "model_version")
 
 
@@ -45,12 +46,14 @@ class HistoryRepository(Protocol):
     def add(self, prediction: Prediction) -> int: ...
 
     def list(
-        self, symbol: str, timeframe: str, limit: int, offset: int
+        self, symbol: str, timeframe: str, limit: int, offset: int, include_shadow: bool = False
     ) -> tuple[list[StoredPrediction], int]: ...
 
     def register_model(self, model_version: str, metadata: dict, evaluation: dict | None) -> None: ...
 
     def save_outcomes(self, outcomes: dict[int, tuple[str, float]]) -> None: ...
+
+    def outcome_summary(self) -> dict: ...
 
     def ping(self) -> None: ...
 
@@ -90,9 +93,11 @@ class PostgresHistoryRepository:
             raise HistoryStorageError("could not save prediction") from err
 
     def list(
-        self, symbol: str, timeframe: str, limit: int, offset: int
+        self, symbol: str, timeframe: str, limit: int, offset: int, include_shadow: bool = False
     ) -> tuple[list[StoredPrediction], int]:
-        where = (PredictionRecord.symbol == symbol, PredictionRecord.timeframe == timeframe)
+        where = [PredictionRecord.symbol == symbol, PredictionRecord.timeframe == timeframe]
+        if not include_shadow:
+            where.append(~PredictionRecord.model_version.startswith(SHADOW_PREFIX, autoescape=True))
         try:
             with session_scope(self._factory) as session:
                 total = session.scalar(select(func.count()).select_from(PredictionRecord).where(*where))
@@ -163,6 +168,55 @@ class PostgresHistoryRepository:
         except SQLAlchemyError as err:
             logger.warning("could not save outcomes: %s", type(err).__name__)
             raise HistoryStorageError("could not save outcomes") from err
+
+    def outcome_summary(self) -> dict:
+        """Counts of finished forecasts: what was said against what happened."""
+        try:
+            with session_scope(self._factory) as session:
+                rows = session.execute(
+                    select(
+                        PredictionRecord.symbol, PredictionRecord.model_version, PredictionRecord.label,
+                        PredictionRecord.outcome_label, func.count(),
+                    )
+                    .where(PredictionRecord.outcome_label.is_not(None))
+                    .group_by(
+                        PredictionRecord.symbol, PredictionRecord.model_version, PredictionRecord.label,
+                        PredictionRecord.outcome_label,
+                    )
+                ).all()
+                waiting = session.scalar(
+                    select(func.count()).select_from(PredictionRecord).where(
+                        PredictionRecord.outcome_label.is_(None),
+                        ~PredictionRecord.model_version.startswith(SHADOW_PREFIX, autoescape=True),
+                    )
+                )
+        except SQLAlchemyError as err:
+            logger.warning("could not summarise outcomes: %s", type(err).__name__)
+            raise HistoryStorageError("could not read history") from err
+
+        everything, rows = rows, [r for r in rows if not r[1].startswith(SHADOW_PREFIX)]
+
+        def tally(position: int, rows=rows) -> list[dict]:
+            totals: dict[str, list[int]] = {}
+            for row in rows:
+                entry = totals.setdefault(row[position], [0, 0])
+                entry[0] += row[4]
+                entry[1] += row[4] if row[2] == row[3] else 0
+            ordered = sorted(totals.items(), key=lambda kv: -kv[1][0])
+            return [{"name": name, "checked": n, "correct": c} for name, (n, c) in ordered]
+
+        happened: dict[str, int] = {}
+        for row in rows:
+            happened[row[3]] = happened.get(row[3], 0) + row[4]
+        return {
+            "checked": sum(r[4] for r in rows),
+            "correct": sum(r[4] for r in rows if r[2] == r[3]),
+            "open": int(waiting or 0),
+            "baseline_correct": max(happened.values(), default=0),
+            "by_symbol": tally(0),
+            "by_model": tally(1, everything),
+            "by_label": tally(2),
+        }
 
     def purge_older_than(self, cutoff: datetime) -> int:
         try:

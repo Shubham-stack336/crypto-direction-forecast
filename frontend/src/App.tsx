@@ -7,12 +7,16 @@ import { Disclaimer } from "./components/Disclaimer";
 import { Icon, type IconName } from "./components/Icon";
 import { Logo } from "./components/Logo";
 import { Loading } from "./components/StateViews";
+import { ThemeToggle } from "./components/ThemeToggle";
 import { GITHUB_URL, LINKEDIN_URL } from "./links";
 import { HomePage } from "./pages/HomePage";
 
 const ForecastPage = lazy(() => import("./pages/ForecastPage"));
 const ScannerPage = lazy(() => import("./pages/ScannerPage"));
 const CoinsPage = lazy(() => import("./pages/CoinsPage"));
+const ComparePage = lazy(() => import("./pages/ComparePage"));
+const AlertsPage = lazy(() => import("./pages/AlertsPage"));
+const RecordPage = lazy(() => import("./pages/RecordPage"));
 const ModelPage = lazy(() => import("./pages/ModelPage"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 
@@ -21,6 +25,9 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: "/forecast", label: "Forecast", icon: "arrow" },
   { to: "/scanner", label: "Scanner", icon: "scan" },
   { to: "/coins", label: "Coins", icon: "dots" },
+  { to: "/compare", label: "Compare", icon: "compare" },
+  { to: "/alerts", label: "Alerts", icon: "bell" },
+  { to: "/record", label: "Record", icon: "check" },
   { to: "/model", label: "Model", icon: "chart" },
   { to: "/about", label: "About", icon: "person" },
 ];
@@ -49,7 +56,10 @@ function Layout() {
             </NavLink>
           ))}
         </nav>
-        <ApiStatus live={live.state} ready={ready.state} />
+        <div className="top-end">
+          <ApiStatus live={live.state} ready={ready.state} />
+          <ThemeToggle />
+        </div>
       </header>
 
       <main id="main" className="page">
@@ -93,6 +103,9 @@ export default function App() {
             <Route path="forecast/:slug?" element={<ForecastPage />} />
             <Route path="scanner" element={<ScannerPage />} />
             <Route path="coins" element={<CoinsPage />} />
+            <Route path="compare" element={<ComparePage />} />
+            <Route path="alerts" element={<AlertsPage />} />
+            <Route path="record" element={<RecordPage />} />
             <Route path="model/:slug?" element={<ModelPage />} />
             <Route path="about" element={<AboutPage />} />
             <Route path="*" element={<NotFound />} />

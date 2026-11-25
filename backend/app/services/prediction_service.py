@@ -15,6 +15,7 @@ from app.repositories.history_repository import (
     HistoryNotConfiguredError,
     HistoryRepository,
     HistoryStorageError,
+    SHADOW_PREFIX,
     StoredPrediction,
 )
 from app.repositories.market_repository import MarketDataUnavailableError, MarketRepository, MarketSymbolError, Ticker
@@ -53,6 +54,7 @@ class ScanRow:
     label: str
     probabilities: dict[str, float]
     model: str
+    confidence: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -149,7 +151,19 @@ class PredictionService:
         if source := candles.attrs.get("source"):
             prediction = replace(prediction, data_quality={**prediction.data_quality, "source": source})
         self._save_candles(candles, symbol, timeframe)
+        self._save_shadow(candles, symbol, timeframe)
         return PredictionOutcome(prediction, self._save(prediction, engine, symbol, timeframe))
+
+    def _save_shadow(self, candles: pd.DataFrame, symbol: str, timeframe: str) -> None:
+        """Let the challenger forecast the same candle. Users never see it and it can never break a request."""
+        engine = self._models.get_challenger(symbol, timeframe) if self._history is not None else None
+        if engine is None:
+            return
+        try:
+            shadow = engine.predict(candles)
+            self._history.add(replace(shadow, symbol=symbol, model_version=SHADOW_PREFIX + shadow.model_version))
+        except (PredictionError, HistoryStorageError) as err:
+            logger.warning("shadow forecast skipped: %s", err)
 
     def _kind(self, symbol: str, timeframe: str) -> str:
         return "dedicated" if self._models.model_symbol(symbol, timeframe) == symbol else "universal"
@@ -195,14 +209,15 @@ class PredictionService:
         except (PredictionError, MarketDataUnavailableError, MarketSymbolError) as err:
             logger.warning("scan skipped %s: %s", t.symbol, err)
             return None
-        return ScanRow(t.symbol, t.last, t.change_pct, p.label, p.probabilities, self._kind(t.symbol, timeframe))
+        kind = self._kind(t.symbol, timeframe)
+        return ScanRow(t.symbol, t.last, t.change_pct, p.label, p.probabilities, kind, p.confidence)
 
     def track_record(self, symbol: str, timeframe: str, now: datetime | None = None) -> TrackRecord:
         """Compare saved forecasts with what the price then did. One forecast per candle counts."""
         if self._history is None:
             raise HistoryNotConfiguredError("no database configured")
         now = now or datetime.now(timezone.utc)
-        saved, _ = self._history.list(symbol, timeframe, TRACK_RECORD_ROWS, 0)
+        saved, _ = self._history.list(symbol, timeframe, TRACK_RECORD_ROWS, 0, include_shadow=True)
         by_candle = {}
         for item in saved:  # newest first, so the latest forecast for a candle wins
             by_candle.setdefault((item.latest_candle_utc, item.model_version), item)
@@ -215,10 +230,11 @@ class PredictionService:
         for item in by_candle.values():
             start = pd.Timestamp(item.latest_candle_utc)
             end = start + item.horizon_candles * length
+            shadow = item.model_version.startswith(SHADOW_PREFIX)
             if item.outcome_label is not None:
                 actual, change = item.outcome_label, item.outcome_return
             elif end + length > now:
-                pending += 1
+                pending += not shadow
                 continue
             else:
                 if close_at is None:  # only ask the exchange when something is still unresolved
@@ -227,11 +243,13 @@ class PredictionService:
                     close_at = dict(zip(closed["timestamp"], closed["close"]))
                 # Judge a forecast by the threshold it was made with, not by today's model.
                 if item.threshold is None or start not in close_at or end not in close_at:
-                    not_checkable += 1
+                    not_checkable += not shadow
                     continue
                 change = float(close_at[end] / close_at[start] - 1)
                 actual = "UP" if change > item.threshold else "DOWN" if change < -item.threshold else "SIDEWAYS"
                 outcomes[item.id] = (actual, change)
+            if shadow:
+                continue
             items.append(
                 CheckedForecast(
                     item.id, item.latest_candle_utc, item.label, actual,
@@ -306,7 +324,9 @@ class PredictionService:
         items, total = self._history.list(symbol, timeframe, limit, offset)
         return HistoryPage(items=items, total=total, limit=limit, offset=offset)
 
-    def market_snapshot(self, symbol: str, timeframe: str, now: datetime | None = None) -> MarketSnapshot:
+    def market_snapshot(
+        self, symbol: str, timeframe: str, now: datetime | None = None, hours: int = SNAPSHOT_CANDLES
+    ) -> MarketSnapshot:
         now = now or datetime.now(timezone.utc)
         raw = self._market.fetch_candles(symbol, timeframe, self._limit)
         df = self._closed_candles(raw, timeframe, now)
@@ -314,7 +334,7 @@ class PredictionService:
 
         latest = df.iloc[-1]
         age = now - (latest["timestamp"] + candle_length)
-        recent = df.tail(SNAPSHOT_CANDLES)
+        recent = df.tail(hours)
         return MarketSnapshot(
             symbol=symbol,
             timeframe=timeframe,
@@ -324,6 +344,20 @@ class PredictionService:
             is_fresh=age <= self._max_staleness * candle_length,
             candles=self._rows(recent),
         )
+
+    def record_summary(self) -> dict:
+        if self._history is None:
+            raise HistoryNotConfiguredError("no database configured")
+        return self._history.outcome_summary()
+
+    def auto_forecast(self, symbols: list[str], timeframe: str = "1h") -> None:
+        """Save a forecast per candle and check old ones, so the public record does not depend on who clicks."""
+        for symbol in symbols:
+            try:
+                self.predict(symbol, timeframe)
+                self.track_record(symbol, timeframe)
+            except (PredictionError, MarketDataUnavailableError, MarketSymbolError, HistoryStorageError) as err:
+                logger.warning("auto forecast skipped %s: %s", symbol, err)
 
     def model_status(self, symbol: str, timeframe: str) -> ModelStatus:
         engine = self._models.get_engine(symbol, timeframe)

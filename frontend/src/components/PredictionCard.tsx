@@ -1,6 +1,7 @@
 import type { Direction, PredictionResult } from "../api/types";
 import type { ApiError } from "../api/client";
 import { formatAge, formatPercent, formatUtc } from "../format";
+import { ConfidenceNote } from "./Confidence";
 import { DirectionBadge } from "./DirectionBadge";
 import { SlideButton } from "./SlideButton";
 import { Card, ErrorBox, Loading } from "./StateViews";
@@ -53,13 +54,14 @@ export function PredictionCard({ state, onPredict, symbolLabel }: Props) {
             ))}
           </ul>
 
+          <ConfidenceNote confidence={state.data.confidence} />
           <p className="hint">
             These are model estimates, not guarantees. When the three numbers are close, the model has little
             confidence.
           </p>
 
           <dl className="facts">
-            <dt>Based on candle closing</dt>
+            <dt>Based on candle started at</dt>
             <dd>{formatUtc(state.data.latest_candle_utc)}</dd>
             <dt>Data age</dt>
             <dd>{formatAge(state.data.data_quality.data_age_minutes)}</dd>

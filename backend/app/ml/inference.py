@@ -9,11 +9,11 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from app.ml.features import FEATURE_COLUMNS, make_features
+from app.ml import features, features_v2
 from app.ml.validation import validate
 
-FEATURE_BUILDERS = {"v1": make_features}
-MIN_HISTORY_CANDLES = 100
+FEATURE_PIPELINES = {"v1": features, "v2": features_v2}
+MIN_HISTORY_CANDLES = {"v1": 100, "v2": 200}
 REQUIRED_COLUMNS = {"timestamp", "open", "high", "low", "close", "volume"}
 DISCLAIMER = (
     "Probabilities are model estimates, not guarantees. "
@@ -60,14 +60,17 @@ class Prediction:
     data_quality: dict
     disclaimer: str
     threshold: float | None = None
+    confidence: dict | None = None
 
 
 class PredictionEngine:
     def __init__(self, model, metadata: dict, max_staleness_candles: int | None = 3, artifact_id: str = ""):
         self.model = model
+        self.sha256 = ""
         self.metadata = metadata
         self.max_staleness_candles = max_staleness_candles
         self.artifact_id = artifact_id
+        self.reliability = metadata.get("reliability")
 
     @classmethod
     def load(
@@ -97,12 +100,14 @@ class PredictionEngine:
         model, metadata = artifact["model"], artifact["metadata"]
         if not hasattr(model, "predict_proba"):
             raise IncompatibleModelError("Model cannot produce probabilities")
-        if metadata.get("feature_version") not in FEATURE_BUILDERS:
+        if metadata.get("feature_version") not in FEATURE_PIPELINES:
             raise IncompatibleModelError(f"Unknown feature version: {metadata.get('feature_version')}")
-        if metadata.get("feature_columns") != FEATURE_COLUMNS:
+        if metadata.get("feature_columns") != FEATURE_PIPELINES[metadata["feature_version"]].FEATURE_COLUMNS:
             raise IncompatibleModelError("Model feature names/order differ from the current pipeline")
 
-        return cls(model, metadata, max_staleness_candles, digest[:8])
+        engine = cls(model, metadata, max_staleness_candles, digest[:8])
+        engine.sha256 = digest
+        return engine
 
     @property
     def model_version(self) -> str:
@@ -110,6 +115,18 @@ class PredictionEngine:
         version = f"{self.metadata['feature_version']}-{trained_day}"
         name = self.metadata.get("model_name")
         return "-".join(part for part in (name, version, self.artifact_id) if part)
+
+    def _confidence(self, top: float) -> dict | None:
+        """How often forecasts with a similar top probability were right on data the model never saw."""
+        info = self.reliability
+        if not info:
+            return None
+        match = next((b for b in info["bins"] if b["from"] <= top < b["to"]), None)
+        return {
+            "level": "clear" if top >= info["clear_threshold"] else "weak",
+            "historical_accuracy": round(match["accuracy"], 4) if match else None,
+            "historical_rows": match["rows"] if match else 0,
+        }
 
     def predict(self, candles, now=None) -> Prediction:
         now = now or datetime.now(timezone.utc)
@@ -129,9 +146,10 @@ class PredictionEngine:
             df = df.iloc[:-1].reset_index(drop=True)
             dropped_incomplete = True
 
-        if len(df) < MIN_HISTORY_CANDLES:
+        needed = MIN_HISTORY_CANDLES[self.metadata["feature_version"]]
+        if len(df) < needed:
             raise InsufficientHistoryError(
-                f"Need at least {MIN_HISTORY_CANDLES} closed candles, got {len(df)}"
+                f"Need at least {needed} closed candles, got {len(df)}"
             )
 
         latest_ts = df["timestamp"].iloc[-1]
@@ -139,17 +157,17 @@ class PredictionEngine:
         if self.max_staleness_candles is not None and age > self.max_staleness_candles * candle_length:
             raise StaleDataError(f"Latest closed candle is {age} old")
 
-        builder = FEATURE_BUILDERS[self.metadata["feature_version"]]
-        features = builder(df)
-        if features.empty or features["timestamp"].iloc[-1] != latest_ts:
+        frame = FEATURE_PIPELINES[self.metadata["feature_version"]].make_features(df)
+        if frame.empty or frame["timestamp"].iloc[-1] != latest_ts:
             raise InsufficientHistoryError("Could not compute features for the latest candle")
 
         columns = self.metadata["feature_columns"]
-        X = features[columns].iloc[[-1]]
+        X = frame[columns].iloc[[-1]]
         if not np.isfinite(X.to_numpy(dtype=float)).all():
             raise InvalidInputError("Features contain non-finite values")
 
-        proba = self.model.predict_proba(X)[0]
+        named = hasattr(self.model, "feature_names_in_")
+        proba = self.model.predict_proba(X if named else X.to_numpy())[0]
         classes = [str(c) for c in self.model.classes_]
 
         return Prediction(
@@ -170,4 +188,5 @@ class PredictionEngine:
             },
             disclaimer=DISCLAIMER,
             threshold=self.metadata["threshold"],
+            confidence=self._confidence(float(np.max(proba))),
         )

@@ -30,6 +30,8 @@ services:
         sync: false
       - key: APP_BACKGROUND_JOBS
         value: "true"
+      - key: APP_AUTO_FORECAST_SYMBOLS
+        value: '["BTC/USDT","ETH/USDT","SOL/USDT","DOGE/USDT","XRP/USDT"]'
       - key: APP_FALLBACK_EXCHANGE_IDS
         value: '["kucoin"]'
       # Render is behind Cloudflare, which sets this header itself. Check after the first deploy.

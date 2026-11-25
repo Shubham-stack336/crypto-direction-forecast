@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router";
 
 import { createPrediction, getHistory, getMarket, getModelStatus, getTrackRecord, toApiError } from "../api/client";
 import { useAsync } from "../api/useAsync";
-import { useAppData } from "../appData";
+import { useAppData, useEveryMinute } from "../appData";
 import { Controls } from "../components/Controls";
 import { HistoryTable } from "../components/HistoryTable";
 import { MarketCard } from "../components/MarketCard";
@@ -20,7 +20,9 @@ export default function ForecastPage() {
 function Forecast({ slug }: { slug: string }) {
   const navigate = useNavigate();
   const { coins, watchlist, toggleWatch } = useAppData();
-  const market = useAsync((signal) => getMarket(slug, signal), [slug]);
+  const [hours, setHours] = useState(24);
+  const market = useAsync((signal) => getMarket(slug, signal, hours), [slug, hours]);
+  useEveryMinute(market.refresh);
   const model = useAsync((signal) => getModelStatus(slug, signal), [slug]);
   const history = useAsync((signal) => getHistory(slug, 20, 0, signal), [slug]);
   const track = useAsync((signal) => getTrackRecord(slug, signal), [slug]);
@@ -60,7 +62,7 @@ function Forecast({ slug }: { slug: string }) {
       />
       <div className="grid">
         <PredictionCard state={prediction} onPredict={run} symbolLabel={slugToSymbol(slug)} />
-        <MarketCard state={market.state} onRetry={market.reload} />
+        <MarketCard state={market.state} onRetry={market.reload} hours={hours} onHours={setHours} />
         <HistoryTable state={history.state} onRetry={history.reload} />
         <TrackRecordCard state={track.state} onRetry={track.reload} />
       </div>

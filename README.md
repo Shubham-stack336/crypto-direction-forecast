@@ -37,3 +37,13 @@ cd frontend; npm install; npm run dev   # http://localhost:5173
 
 Tests: `cd backend; .\.venv\Scripts\python -m pytest -q` and `cd frontend; npm test`.
 Deployment: [DEPLOYMENT.md](DEPLOYMENT.md).
+
+## Reliability
+
+- Each forecast shows how often forecasts that confident were right on a year of data (2023-11 to 2024-10) that no model
+  saw. The 20% most confident are marked "Clearer signal": for BTC they were right 54.9% of the time, the rest 36.3%.
+- Model v2 (`backend/scripts/train_v2.py`) was tested once against rules fixed in advance. It had better probabilities
+  (log loss 1.043 against 1.067, calibration error 0.010 against 0.049) and accuracy (42.1% against 39.9%), but its
+  balanced accuracy fell by 0.0053 and the limit was 0.005, so it was **not** promoted. It forecasts in shadow mode and
+  the Record page compares both on live data. `APP_SERVE_CHALLENGER=true` would switch to it.
+- After replacing a model, run `scripts/measure_reliability.py` and then `scripts/model_registry.py publish`.

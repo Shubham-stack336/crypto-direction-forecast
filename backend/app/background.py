@@ -8,10 +8,11 @@ logger = logging.getLogger(__name__)
 
 
 class BackgroundWorker:
-    def __init__(self, store: CacheStore, refresh_scan, purge=None, interval_s: int = 120):
+    def __init__(self, store: CacheStore, refresh_scan, purge=None, interval_s: int = 120, auto_forecast=None):
         self._store = store
         self._refresh_scan = refresh_scan
         self._purge = purge
+        self._auto_forecast = auto_forecast
         self._interval = interval_s
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="background", daemon=True)
@@ -27,6 +28,8 @@ class BackgroundWorker:
         # With Redis the lock is shared, so only one worker process does the job per interval.
         if self._store.acquire("job:scan", max(1, self._interval - 5)):
             self._guard(self._refresh_scan)
+        if self._auto_forecast and self._store.acquire("job:forecast", 1_800):
+            self._guard(self._auto_forecast)
         if self._purge and self._store.acquire("job:purge", 86_400):
             self._guard(self._purge)
 

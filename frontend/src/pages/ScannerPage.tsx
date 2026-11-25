@@ -8,7 +8,7 @@ export default function ScannerPage() {
     <>
       <div className="page-head">
         <h1>Scanner</h1>
-        <p>One forecast for each of the busiest coins, highest probability first.</p>
+        <p>One forecast for each of the busiest coins, highest probability first. Filter to the clearer signals.</p>
       </div>
       <Scanner onSelect={(slug) => navigate(`/forecast/${slug}`)} />
     </>

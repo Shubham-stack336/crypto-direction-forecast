@@ -1,0 +1,207 @@
+{
+  "candidate_model": "model_v2",
+  "test_period": [
+    "2023-11-08 00:00:00+00:00",
+    "2024-10-09 18:00:00+00:00"
+  ],
+  "test_rows": 37730,
+  "test_class_distribution": {
+    "UP": 14551,
+    "DOWN": 14484,
+    "SIDEWAYS": 8695
+  },
+  "results": {
+    "model_v2": {
+      "log_loss": 1.0425904724439339,
+      "calibration_error": 0.009881309407943578,
+      "balanced_accuracy": 0.3930151300387433,
+      "accuracy": 0.42120328650940897,
+      "directional_hit_rate": 0.5233828996282528,
+      "macro_f1": 0.3863011060597213
+    },
+    "current_models": {
+      "log_loss": 1.0673650644431687,
+      "calibration_error": 0.048595823721025555,
+      "balanced_accuracy": 0.3983390493781363,
+      "accuracy": 0.3987278028094355,
+      "directional_hit_rate": 0.5308941230276698,
+      "macro_f1": 0.392965178639266
+    },
+    "naive_class_frequency": {
+      "log_loss": 1.074943843158892,
+      "calibration_error": 0.016211091456446575,
+      "balanced_accuracy": 0.3333333333333333,
+      "accuracy": 0.3838855022528492,
+      "directional_hit_rate": 0.49884622007921475,
+      "macro_f1": 0.18493124449381393
+    }
+  },
+  "groups": {
+    "own_model_coins": {
+      "model_v2": {
+        "log_loss": 1.0583442096429445,
+        "calibration_error": 0.019191468867072684,
+        "balanced_accuracy": 0.41549449476759165,
+        "accuracy": 0.4153061224489796,
+        "directional_hit_rate": 0.5261050608584241,
+        "macro_f1": 0.41021667025163727
+      },
+      "current_models": {
+        "log_loss": 1.0785855283502996,
+        "calibration_error": 0.021365293932994977,
+        "balanced_accuracy": 0.3930065243791218,
+        "accuracy": 0.3888682745825603,
+        "directional_hit_rate": 0.5342356687898089,
+        "macro_f1": 0.388594127399103
+      }
+    },
+    "never_trained_coins": {
+      "model_v2": {
+        "log_loss": 1.0282501347332638,
+        "calibration_error": 0.007943443509386146,
+        "balanced_accuracy": 0.35852911479516386,
+        "accuracy": 0.42894248608534324,
+        "directional_hit_rate": 0.5245294662141314,
+        "macro_f1": 0.3303392968677765
+      },
+      "current_models": {
+        "log_loss": 1.0573458730178797,
+        "calibration_error": 0.06403449747296731,
+        "balanced_accuracy": 0.380472399311888,
+        "accuracy": 0.408286951144094,
+        "directional_hit_rate": 0.5302575302575303,
+        "macro_f1": 0.3784463279847308
+      }
+    }
+  },
+  "clear_signal": {
+    "threshold": 0.4487149323378854,
+    "share": 0.3031009806520011,
+    "accuracy": 0.47700244840853445,
+    "accuracy_other": 0.3969346619000532,
+    "by_label": {
+      "DOWN": {
+        "rows": 6778,
+        "accuracy": 0.4520507524343464
+      },
+      "SIDEWAYS": {
+        "rows": 1181,
+        "accuracy": 0.558848433530906
+      },
+      "UP": {
+        "rows": 3477,
+        "accuracy": 0.49784296807592754
+      }
+    }
+  },
+  "confidence_bins": [
+    {
+      "from": 0,
+      "to": 0.4,
+      "rows": 11481,
+      "accuracy": 0.3719188224022298
+    },
+    {
+      "from": 0.4,
+      "to": 0.45,
+      "rows": 15173,
+      "accuracy": 0.4169907071772227
+    },
+    {
+      "from": 0.45,
+      "to": 0.5,
+      "rows": 8582,
+      "accuracy": 0.45572127709158705
+    },
+    {
+      "from": 0.5,
+      "to": 0.55,
+      "rows": 1809,
+      "accuracy": 0.5135433941404091
+    },
+    {
+      "from": 0.55,
+      "to": 0.6,
+      "rows": 294,
+      "accuracy": 0.6156462585034014
+    },
+    {
+      "from": 0.6,
+      "to": 0.7,
+      "rows": 314,
+      "accuracy": 0.6815286624203821
+    }
+  ],
+  "acceptance_checks": {
+    "log_loss_beats_current_and_baseline": true,
+    "calibration_better": true,
+    "balanced_accuracy_kept": false
+  },
+  "cross_validation": {
+    "current_recipe_rf_balanced": {
+      "log_loss": 1.081237309946037,
+      "calibration_error": 0.05347435716775283,
+      "balanced_accuracy": 0.3952497248876365,
+      "accuracy": 0.37533446519524616,
+      "directional_hit_rate": 0.5149048426606369,
+      "macro_f1": 0.3608326942899254
+    },
+    "boosting_v1_features": {
+      "log_loss": 1.0719283550294287,
+      "calibration_error": 0.022033458259037093,
+      "balanced_accuracy": 0.3908904059998172,
+      "accuracy": 0.4009779286926995,
+      "directional_hit_rate": 0.5120534853322476,
+      "macro_f1": 0.391147723216221
+    },
+    "boosting_v2_small": {
+      "log_loss": 1.056423615926627,
+      "calibration_error": 0.017106319661091753,
+      "balanced_accuracy": 0.409301533001363,
+      "accuracy": 0.41498132427843804,
+      "directional_hit_rate": 0.517986247761392,
+      "macro_f1": 0.41245871490607594
+    },
+    "boosting_v2_medium": {
+      "log_loss": 1.0619167354162857,
+      "calibration_error": 0.02313247026905214,
+      "balanced_accuracy": 0.40679929721617064,
+      "accuracy": 0.41221052631578947,
+      "directional_hit_rate": 0.515194534403975,
+      "macro_f1": 0.41001203253938806
+    },
+    "forest_v2": {
+      "log_loss": 1.0555431039388856,
+      "calibration_error": 0.01150080840188871,
+      "balanced_accuracy": 0.406494767047314,
+      "accuracy": 0.4143157894736842,
+      "directional_hit_rate": 0.5207334089125316,
+      "macro_f1": 0.4080930759444595
+    },
+    "logistic_v2": {
+      "log_loss": 1.063350543144529,
+      "calibration_error": 0.015388962341035067,
+      "balanced_accuracy": 0.4087435460190796,
+      "accuracy": 0.4162444821731749,
+      "directional_hit_rate": 0.5292764167068413,
+      "macro_f1": 0.4109613524546322
+    }
+  },
+  "holdout_coins": [
+    "BTC",
+    "ETH",
+    "SOL",
+    "DOGE",
+    "XRP",
+    "LINK",
+    "ADA",
+    "INJ",
+    "PEPE",
+    "SHIB",
+    "AAVE",
+    "VET",
+    "FET",
+    "GRT"
+  ],
+  "note": "The holdout year lies before the training period. No model saw it and it was used once. Coins are chosen among those listed today, so delisted coins are not represented."
+}

@@ -1,6 +1,6 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Query
 
 from app.controllers.market_controller import MarketController
 from app.core.symbols import SYMBOL_PATH_PATTERN
@@ -18,9 +18,10 @@ router = APIRouter(prefix="/api/v1/market", tags=["market"])
 def get_market(
     symbol: str = Path(pattern=SYMBOL_PATH_PATTERN, description="e.g. BTC-USDT"),
     timeframe: Literal["1h"] = "1h",
+    hours: int = Query(24, ge=2, le=336),
     controller: MarketController = Depends(get_market_controller),
 ):
-    return controller.get_market(symbol, timeframe)
+    return controller.get_market(symbol, timeframe, hours)
 
 
 @router.get(

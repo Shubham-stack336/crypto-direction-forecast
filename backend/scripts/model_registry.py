@@ -27,7 +27,7 @@ def publish() -> None:
     for path in ARTIFACTS.glob("*_rf.joblib"):
         target = ARCHIVE / path.stem / digest(path)[:8]
         target.mkdir(parents=True, exist_ok=True)
-        for source in (path, path.with_suffix(".metrics.json")):
+        for source in (path, path.with_suffix(".metrics.json"), path.with_suffix(".reliability.json")):
             if source.exists():
                 shutil.copy2(source, target / source.name)
     write_manifest()

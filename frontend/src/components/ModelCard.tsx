@@ -6,6 +6,9 @@ import { Card, Empty, ErrorBox, Loading } from "./StateViews";
 const MODEL_NAMES: Record<string, string> = {
   random_forest: "Random forest (the model used)",
   logistic_regression: "Logistic regression (reference)",
+  model_v2: "Model v2 (in testing)",
+  current_models: "Current models",
+  naive_class_frequency: "Naive: class frequencies",
   naive_most_frequent: "Naive: always the most common class",
 };
 

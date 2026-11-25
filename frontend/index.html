@@ -11,6 +11,14 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300..600&display=swap"
     />
+    <script>
+      // Set the theme before the first paint so night mode does not flash white.
+      try {
+        var t = localStorage.getItem("theme");
+        var d = t === "dark" || (t !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = d ? "dark" : "light";
+      } catch (e) {}
+    </script>
     <title>Crypto Direction</title>
   </head>
   <body>

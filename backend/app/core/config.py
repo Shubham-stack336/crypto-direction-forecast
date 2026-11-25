@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     rate_limit_scan: int = Field(6, ge=0)
     client_ip_header: str | None = None
     background_jobs: bool = False
+    serve_challenger: bool = False  # answer with artifacts/challenger instead of only testing it
+    auto_forecast_symbols: list[str] = Field(default_factory=list)  # e.g. ["BTC/USDT"]; needs background_jobs
     history_retention_days: int = Field(0, ge=0)  # 0 keeps everything
     metrics_token: str | None = None
     sentry_dsn: str | None = None
