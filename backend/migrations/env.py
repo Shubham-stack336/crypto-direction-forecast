@@ -2,7 +2,7 @@
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import create_engine, pool
+from sqlalchemy import create_engine, pool, text
 
 from app.core.config import get_settings, normalize_database_url
 from app.repositories import orm  # noqa: F401  (registers the tables on Base.metadata)
@@ -38,6 +38,9 @@ def run_migrations_online() -> None:
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
+            if connection.dialect.name == "postgresql":
+                # Instances starting together wait for each other; released when the transaction ends.
+                connection.execute(text("SELECT pg_advisory_xact_lock(727401)"))
             context.run_migrations()
 
 

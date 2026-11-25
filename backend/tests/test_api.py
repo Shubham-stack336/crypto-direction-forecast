@@ -140,7 +140,7 @@ def test_model_status(make_client, live_market):
     response = client.get("/api/v1/models/BTC-USDT/status")
     assert response.status_code == 200
     body = response.json()
-    assert body["model_version"] == "v1-2026-01-01"
+    assert body["model_version"].startswith("v1-2026-01-01-")
     assert body["horizon_candles"] == 3
     assert body["evaluation"]["candidate_model"] == "synthetic-test-model"
     assert body["feature_columns"][0] == "ret_1"

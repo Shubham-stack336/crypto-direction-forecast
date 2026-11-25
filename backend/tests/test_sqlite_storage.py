@@ -67,6 +67,6 @@ def test_api_saves_predictions_and_registers_model_once(make_client, live_market
     for _ in range(2):
         assert client.post("/api/v1/predictions/BTC-USDT").json()["saved"] is True
     page = client.get("/api/v1/predictions/BTC-USDT/history").json()
-    assert page["total"] == 2
+    assert page["total"] == 1  # same candle and model
     with factory() as session:
         assert session.scalar(select(func.count()).select_from(ModelVersionRecord)) == 1

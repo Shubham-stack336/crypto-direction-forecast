@@ -29,7 +29,7 @@ def test_prediction_is_structured(engine, market, now):
     assert result.symbol == "BTC/USDT"
     assert result.timeframe == "1h"
     assert result.horizon_candles == 3
-    assert result.model_version == "v1-2026-01-01"
+    assert result.model_version.startswith("v1-2026-01-01-")
     assert result.latest_candle_utc == market["timestamp"].iloc[-1].isoformat()
     assert result.data_quality["dropped_incomplete_candle"] is False
 

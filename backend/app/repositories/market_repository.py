@@ -60,14 +60,31 @@ class CcxtMarketRepository:
     ):
         if not hasattr(ccxt, exchange_id):
             raise ValueError(f"Unknown exchange: {exchange_id}")
+        options = {"fetchMarkets": {"types": ["spot"]}} if exchange_id == "binance" else {}
         self._exchange = getattr(ccxt, exchange_id)(
-            {"enableRateLimit": True, "timeout": timeout_ms}
+            {"enableRateLimit": True, "timeout": timeout_ms, "options": options}
         )
+        self._markets_lock = threading.Lock()
         self._max_retries = max_retries
         self._sleep = sleep
         self._tickers: tuple[float, list[Ticker]] | None = None
         self._tickers_lock = threading.Lock()
         self.source = f"{exchange_id} via ccxt"
+
+    def _retry(self, action: Callable):
+        for attempt in range(1, self._max_retries + 1):
+            try:
+                return action()
+            except ccxt.NetworkError as err:
+                logger.warning("market fetch attempt %d/%d failed: %s", attempt, self._max_retries, err)
+                if attempt == self._max_retries:
+                    raise
+                self._sleep(0.5 * 2**attempt)
+
+    def _markets(self) -> dict:
+        """The market list is large: after a cold start one request loads it and the others wait for it."""
+        with self._markets_lock:
+            return self._exchange.load_markets()
 
     def list_tickers(self) -> list[Ticker]:
         """Every active spot USDT pair that can be forecast, busiest first. Cached for a minute."""
@@ -75,8 +92,8 @@ class CcxtMarketRepository:
             if self._tickers and time.monotonic() - self._tickers[0] < TICKER_CACHE_S:
                 return self._tickers[1]
             try:
-                markets = self._exchange.load_markets()
-                raw = self._exchange.fetch_tickers()
+                markets = self._retry(self._markets)
+                raw = self._retry(self._exchange.fetch_tickers)
             except ccxt.BaseError as err:
                 logger.warning("ticker fetch failed: %s", err)
                 raise MarketDataUnavailableError("ticker list unavailable") from err
@@ -103,20 +120,20 @@ class CcxtMarketRepository:
             return tickers
 
     def fetch_candles(self, symbol: str, timeframe: str, limit: int) -> pd.DataFrame:
-        for attempt in range(1, self._max_retries + 1):
-            try:
-                raw = self._exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
-                break
-            except ccxt.BadSymbol as err:
-                raise MarketSymbolError(symbol) from err
-            except ccxt.NetworkError as err:
-                logger.warning("market fetch attempt %d/%d failed: %s", attempt, self._max_retries, err)
-                if attempt == self._max_retries:
-                    raise MarketDataUnavailableError("market data provider unreachable") from err
-                self._sleep(0.5 * 2**attempt)
-            except ccxt.ExchangeError as err:
-                logger.warning("market provider error: %s", err)
-                raise MarketDataUnavailableError("market data provider error") from err
+        def fetch():
+            if not getattr(self._exchange, "markets", True):
+                self._markets()
+            return self._exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
+
+        try:
+            raw = self._retry(fetch)
+        except ccxt.BadSymbol as err:
+            raise MarketSymbolError(symbol) from err
+        except ccxt.NetworkError as err:
+            raise MarketDataUnavailableError("market data provider unreachable") from err
+        except ccxt.ExchangeError as err:
+            logger.warning("market provider error: %s", err)
+            raise MarketDataUnavailableError("market data provider error") from err
 
         df = pd.DataFrame(raw, columns=COLUMNS)
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True)

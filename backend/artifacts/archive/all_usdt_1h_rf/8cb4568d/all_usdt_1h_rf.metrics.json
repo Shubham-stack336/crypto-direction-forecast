@@ -1,0 +1,208 @@
+{
+  "candidate_model": "random_forest",
+  "test_period": [
+    "2026-08-07 11:00:00+00:00",
+    "2026-11-24 07:00:00+00:00"
+  ],
+  "test_rows": 26130,
+  "test_class_distribution": {
+    "DOWN": 10645,
+    "UP": 9927,
+    "SIDEWAYS": 5558
+  },
+  "results": {
+    "random_forest": {
+      "accuracy": 0.38710294680443935,
+      "balanced_accuracy": 0.3779485549458978,
+      "macro_f1": 0.3738649403303291,
+      "directional_hit_rate": 0.5209334682519605,
+      "confusion_matrix_rows_true_cols_pred": [
+        [
+          4975,
+          2650,
+          3020
+        ],
+        [
+          2298,
+          1878,
+          1382
+        ],
+        [
+          4555,
+          2110,
+          3262
+        ]
+      ]
+    },
+    "logistic_regression": {
+      "accuracy": 0.35652506697282815,
+      "balanced_accuracy": 0.37657678954789825,
+      "macro_f1": 0.35579946784996414,
+      "directional_hit_rate": 0.5162120031176929,
+      "confusion_matrix_rows_true_cols_pred": [
+        [
+          3233,
+          4214,
+          3198
+        ],
+        [
+          1372,
+          2693,
+          1493
+        ],
+        [
+          3009,
+          3528,
+          3390
+        ]
+      ]
+    },
+    "naive_most_frequent": {
+      "accuracy": 0.4073861461921163,
+      "balanced_accuracy": 0.3333333333333333,
+      "macro_f1": 0.19297530024926354,
+      "directional_hit_rate": 0.5174509041415516,
+      "confusion_matrix_rows_true_cols_pred": [
+        [
+          10645,
+          0,
+          0
+        ],
+        [
+          5558,
+          0,
+          0
+        ],
+        [
+          9927,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  "results_on_training_coins": {
+    "random_forest": {
+      "accuracy": 0.4161347110600842,
+      "balanced_accuracy": 0.42729907660963223,
+      "macro_f1": 0.4114220476390405,
+      "directional_hit_rate": 0.5274897476077751,
+      "confusion_matrix_rows_true_cols_pred": [
+        [
+          9348,
+          8766,
+          5593
+        ],
+        [
+          4583,
+          11363,
+          2880
+        ],
+        [
+          8579,
+          7740,
+          6473
+        ]
+      ]
+    },
+    "logistic_regression": {
+      "accuracy": 0.3933409873708381,
+      "balanced_accuracy": 0.4137192374385565,
+      "macro_f1": 0.3791383778361191,
+      "directional_hit_rate": 0.5206940330088871,
+      "confusion_matrix_rows_true_cols_pred": [
+        [
+          5896,
+          11981,
+          5830
+        ],
+        [
+          2553,
+          13391,
+          2882
+        ],
+        [
+          5496,
+          10888,
+          6408
+        ]
+      ]
+    },
+    "naive_most_frequent": {
+      "accuracy": 0.36290853425181785,
+      "balanced_accuracy": 0.3333333333333333,
+      "macro_f1": 0.17751669811603318,
+      "directional_hit_rate": 0.509838921267124,
+      "confusion_matrix_rows_true_cols_pred": [
+        [
+          23707,
+          0,
+          0
+        ],
+        [
+          18826,
+          0,
+          0
+        ],
+        [
+          22792,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  "balanced_accuracy_per_unseen_coin": {
+    "AAVE": 0.3622808716164246,
+    "ALGO": 0.37670432199469034,
+    "FET": 0.35836988304093564,
+    "GRT": 0.37992035314006145,
+    "ICP": 0.37423361509994774,
+    "PEPE": 0.3716972991779797,
+    "SAND": 0.3913178912136704,
+    "SHIB": 0.3648098831681898,
+    "TIA": 0.3735592596425003,
+    "VET": 0.3862746003137143
+  },
+  "train_coins": [
+    "BTC",
+    "ETH",
+    "SOL",
+    "DOGE",
+    "BNB",
+    "XRP",
+    "ADA",
+    "TRX",
+    "AVAX",
+    "LINK",
+    "DOT",
+    "LTC",
+    "BCH",
+    "UNI",
+    "ATOM",
+    "NEAR",
+    "APT",
+    "FIL",
+    "ETC",
+    "ARB",
+    "OP",
+    "INJ",
+    "SUI",
+    "XLM",
+    "HBAR"
+  ],
+  "unseen_coins": [
+    "PEPE",
+    "SHIB",
+    "AAVE",
+    "ICP",
+    "ALGO",
+    "VET",
+    "SAND",
+    "GRT",
+    "FET",
+    "TIA"
+  ],
+  "skipped": {},
+  "note": "Scores are on coins the model never saw, in a later period. Coins are chosen among those listed today, so delisted coins are not represented."
+}

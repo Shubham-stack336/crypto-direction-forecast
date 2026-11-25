@@ -1,0 +1,26 @@
+# Local production-like stack: docker compose up --build   (the password is for local use only)
+services:
+  db:
+    image: postgres:16
+    environment: { POSTGRES_USER: crypto_app, POSTGRES_PASSWORD: local_only, POSTGRES_DB: crypto_predictions }
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crypto_app -d crypto_predictions"]
+      interval: 3s
+      retries: 20
+  redis:
+    image: redis:7
+  api:
+    build: backend
+    ports: ["8000:8000"]
+    environment:
+      APP_ENVIRONMENT: production
+      APP_DATABASE_URL: postgresql://crypto_app:local_only@db:5432/crypto_predictions
+      APP_REDIS_URL: redis://redis:6379/0
+      APP_CORS_ORIGINS: '["http://localhost:5173"]'
+      APP_BACKGROUND_JOBS: "true"
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+volumes:
+  pgdata:

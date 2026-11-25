@@ -19,7 +19,7 @@ function Record({ record }: { record: TrackRecord }) {
   if (record.checked === 0) return <Empty>No finished forecast to check yet.{waiting}</Empty>;
   return (
     <>
-      <p className="price">{formatPercent(record.correct / record.checked, 0)}</p>
+      <p className="price">{record.checked < 30 ? `${record.correct}/${record.checked}` : formatPercent(record.correct / record.checked, 0)}</p>
       <p className="hint">
         {record.correct} of {record.checked} saved forecasts were right.{waiting}
         {record.checked < 30 && " Too few to judge the model yet."}

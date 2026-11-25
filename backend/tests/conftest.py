@@ -14,7 +14,8 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sqlalchemy import text
 
-from app.dependencies import get_candle_repository, get_history_repository, get_market_repository, get_model_repository
+from app.core.cache import MemoryStore
+from app.dependencies import get_cache_store, get_candle_repository, get_history_repository, get_market_repository, get_model_repository
 from app.main import create_app
 from app.ml.features import FEATURE_COLUMNS, make_features
 from app.ml.inference import DISCLAIMER, Prediction, PredictionEngine
@@ -45,12 +46,13 @@ def make_prediction(label="UP", at="2026-01-20T12:00:00+00:00", symbol="BTC/USDT
         timeframe="1h",
         horizon_candles=3,
         prediction_time_utc=at,
-        latest_candle_utc="2026-01-20T11:00:00+00:00",
+        latest_candle_utc=(pd.Timestamp(at).floor("h") - pd.Timedelta(hours=1)).isoformat(),
         model_version="v1-2026-01-01",
         feature_version="v1",
         status="ok",
         data_quality={"rows_used": 499, "dropped_incomplete_candle": True, "data_age_minutes": 5.0},
         disclaimer=DISCLAIMER,
+        threshold=0.003,
     )
 
 
@@ -212,6 +214,8 @@ def make_client(model_dir):
         app.dependency_overrides[get_model_repository] = lambda: model_repo
         app.dependency_overrides[get_history_repository] = lambda: history_repo
         app.dependency_overrides[get_candle_repository] = lambda: candle_repo
+        store = MemoryStore()
+        app.dependency_overrides[get_cache_store] = lambda: store
         return TestClient(app, raise_server_exceptions=False)
 
     return _make

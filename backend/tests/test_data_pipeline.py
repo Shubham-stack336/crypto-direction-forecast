@@ -1,11 +1,10 @@
 """Unit tests for Phase 1: Data Pipeline, Repository, and Validation."""
 
-from datetime import datetime, timedelta
 import pandas as pd
 import pytest
 
 from app.repositories.data_repository import DataRepository
-from app.services.data_service import DataService, REQUIRED_COLUMNS
+from app.services.data_service import DataService
 
 
 @pytest.fixture
@@ -89,13 +88,9 @@ class TestDataService:
         assert result["high_low_valid"] is False
         assert result["valid"] is False
 
-    def test_fetch_and_validate_live_btc(self):
-        """Integration test: verify real yfinance fetch works and validates."""
-        service = DataService()
-        df = service.fetch_historical("BTC-USD", period="1mo", interval="1d")
-        assert len(df) >= 20
-        for col in REQUIRED_COLUMNS:
-            assert col in df.columns
-        assert df.index.is_monotonic_increasing
-        validation = service.validate_data(df)
-        assert validation["valid"] is True
+    def test_missing_data_is_an_error_not_an_invention(self, monkeypatch):
+        import yfinance
+
+        monkeypatch.setattr(yfinance, "download", lambda *a, **k: pd.DataFrame())
+        with pytest.raises(ValueError, match="No market data"):
+            DataService().fetch_historical("NOSUCHCOIN")

@@ -1,10 +1,13 @@
 """Business workflows. No FastAPI objects and no raw exchange/file/SQL access in here."""
+import json
 import logging
-from dataclasses import dataclass, replace
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 
 import pandas as pd
 
+from app.core.cache import CacheStore
 from app.ml.inference import InvalidInputError, Prediction, PredictionError
 from app.ml.validation import validate
 from app.repositories.candle_repository import PostgresCandleRepository
@@ -22,6 +25,9 @@ logger = logging.getLogger(__name__)
 SNAPSHOT_CANDLES = 24
 SAVED_CANDLES = 3
 TRACK_RECORD_ROWS = 200
+SCAN_MAX = 20
+SCAN_TTL_S = 300
+SCAN_THREADS = 4
 
 
 @dataclass(frozen=True)
@@ -126,11 +132,13 @@ class PredictionService:
         max_staleness_candles: int,
         history_repo: HistoryRepository | None = None,
         candle_repo: PostgresCandleRepository | None = None,
+        cache: CacheStore | None = None,
     ):
         self._market = market_repo
         self._models = model_repo
         self._history = history_repo
         self._candles = candle_repo
+        self._cache = cache
         self._limit = candles_limit
         self._max_staleness = max_staleness_candles
 
@@ -138,6 +146,8 @@ class PredictionService:
         engine = self._models.get_engine(symbol, timeframe)
         candles = self._market.fetch_candles(symbol, timeframe, self._limit)
         prediction = replace(engine.predict(candles), symbol=symbol)
+        if source := candles.attrs.get("source"):
+            prediction = replace(prediction, data_quality={**prediction.data_quality, "source": source})
         self._save_candles(candles, symbol, timeframe)
         return PredictionOutcome(prediction, self._save(prediction, engine, symbol, timeframe))
 
@@ -152,20 +162,40 @@ class PredictionService:
 
     def scan(self, timeframe: str, limit: int) -> list[ScanRow]:
         """Forecast the busiest coins. Nothing is saved; a coin that cannot be forecast is left out."""
-        rows = []
-        for t in self._market.list_tickers()[:limit]:
-            try:
-                engine = self._models.get_engine(t.symbol, timeframe)
-                p = engine.predict(self._market.fetch_candles(t.symbol, timeframe, self._limit))
-            except (PredictionError, MarketDataUnavailableError, MarketSymbolError) as err:
-                logger.warning("scan skipped %s: %s", t.symbol, err)
-                continue
-            rows.append(
-                ScanRow(t.symbol, t.last, t.change_pct, p.label, p.probabilities, self._kind(t.symbol, timeframe))
-            )
+        if self._cache is None:
+            return self._run_scan(timeframe, limit)
+        cached = self._cache.get(self._scan_key(timeframe))
+        rows = [ScanRow(**r) for r in json.loads(cached)] if cached else self.refresh_scan(timeframe)
+        return rows[:limit]
+
+    @staticmethod
+    def _scan_key(timeframe: str) -> str:
+        # The hour is part of the key: a new candle means a new forecast.
+        return f"scan:{timeframe}:{int(datetime.now(timezone.utc).timestamp() // 3600)}"
+
+    def refresh_scan(self, timeframe: str = "1h") -> list[ScanRow]:
+        """Also called in the background so that users find a ready result."""
+        key = self._scan_key(timeframe)
+        rows = self._run_scan(timeframe, SCAN_MAX)
+        self._cache.set(key, json.dumps([asdict(r) for r in rows]).encode(), SCAN_TTL_S)
+        return rows
+
+    def _run_scan(self, timeframe: str, limit: int) -> list[ScanRow]:
+        tickers = self._market.list_tickers()[:limit]
+        with ThreadPoolExecutor(SCAN_THREADS) as pool:
+            rows = [r for r in pool.map(lambda t: self._scan_one(t, timeframe), tickers) if r is not None]
         if not rows:
             raise MarketDataUnavailableError("no coin could be scanned")
         return rows
+
+    def _scan_one(self, t: Ticker, timeframe: str) -> ScanRow | None:
+        try:
+            engine = self._models.get_engine(t.symbol, timeframe)
+            p = engine.predict(self._market.fetch_candles(t.symbol, timeframe, self._limit))
+        except (PredictionError, MarketDataUnavailableError, MarketSymbolError) as err:
+            logger.warning("scan skipped %s: %s", t.symbol, err)
+            return None
+        return ScanRow(t.symbol, t.last, t.change_pct, p.label, p.probabilities, self._kind(t.symbol, timeframe))
 
     def track_record(self, symbol: str, timeframe: str, now: datetime | None = None) -> TrackRecord:
         """Compare saved forecasts with what the price then did. One forecast per candle counts."""
@@ -179,28 +209,39 @@ class PredictionService:
         if not by_candle:
             return TrackRecord(symbol, 0, 0, 0, 0, [])
 
-        threshold = self._models.get_engine(symbol, timeframe).metadata["threshold"]
-        raw = self._market.fetch_candles(symbol, timeframe, self._limit)
-        closed = self._closed_candles(raw, timeframe, now)
-        close_at = dict(zip(closed["timestamp"], closed["close"]))
         length = pd.Timedelta(timeframe)
-        items, pending, not_checkable = [], 0, 0
+        close_at = None
+        items, outcomes, pending, not_checkable = [], {}, 0, 0
         for item in by_candle.values():
             start = pd.Timestamp(item.latest_candle_utc)
             end = start + item.horizon_candles * length
-            if end + length > now:
+            if item.outcome_label is not None:
+                actual, change = item.outcome_label, item.outcome_return
+            elif end + length > now:
                 pending += 1
-            elif start not in close_at or end not in close_at:
-                not_checkable += 1
+                continue
             else:
+                if close_at is None:  # only ask the exchange when something is still unresolved
+                    raw = self._market.fetch_candles(symbol, timeframe, self._limit)
+                    closed = self._closed_candles(raw, timeframe, now)
+                    close_at = dict(zip(closed["timestamp"], closed["close"]))
+                # Judge a forecast by the threshold it was made with, not by today's model.
+                if item.threshold is None or start not in close_at or end not in close_at:
+                    not_checkable += 1
+                    continue
                 change = float(close_at[end] / close_at[start] - 1)
-                actual = "UP" if change > threshold else "DOWN" if change < -threshold else "SIDEWAYS"
-                items.append(
-                    CheckedForecast(
-                        item.id, item.latest_candle_utc, item.label, actual,
-                        round(change * 100, 3), actual == item.label,
-                    )
+                actual = "UP" if change > item.threshold else "DOWN" if change < -item.threshold else "SIDEWAYS"
+                outcomes[item.id] = (actual, change)
+            items.append(
+                CheckedForecast(
+                    item.id, item.latest_candle_utc, item.label, actual,
+                    round(change * 100, 3), actual == item.label,
                 )
+            )
+        try:
+            self._history.save_outcomes(outcomes)
+        except HistoryStorageError:
+            logger.warning("outcomes could not be saved; they will be computed again")
         return TrackRecord(
             symbol, len(items), sum(i.correct for i in items), pending, not_checkable, items[:20]
         )

@@ -29,6 +29,16 @@ class Settings(BaseSettings):
     environment: str = "development"
     model_dir: Path = BASE_DIR / "artifacts"
     exchange_id: str = "binance"
+    fallback_exchange_ids: list[str] = Field(default_factory=list)
+    redis_url: str | None = None
+    rate_limit_general: int = Field(120, ge=0)  # requests per minute and client; 0 switches a limit off
+    rate_limit_predict: int = Field(10, ge=0)
+    rate_limit_scan: int = Field(6, ge=0)
+    client_ip_header: str | None = None
+    background_jobs: bool = False
+    history_retention_days: int = Field(0, ge=0)  # 0 keeps everything
+    metrics_token: str | None = None
+    sentry_dsn: str | None = None
     market_timeout_ms: int = Field(10_000, ge=1_000, le=60_000)
     market_max_retries: int = Field(3, ge=1, le=5)
     market_candles_limit: int = Field(500, ge=150, le=1000)

@@ -1,4 +1,6 @@
 """Reusable inference engine. Independent of FastAPI and any database."""
+import hashlib
+import io
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -57,22 +59,35 @@ class Prediction:
     status: str
     data_quality: dict
     disclaimer: str
+    threshold: float | None = None
 
 
 class PredictionEngine:
-    def __init__(self, model, metadata: dict, max_staleness_candles: int | None = 3):
+    def __init__(self, model, metadata: dict, max_staleness_candles: int | None = 3, artifact_id: str = ""):
         self.model = model
         self.metadata = metadata
         self.max_staleness_candles = max_staleness_candles
+        self.artifact_id = artifact_id
 
     @classmethod
-    def load(cls, path, max_staleness_candles: int | None = 3) -> "PredictionEngine":
+    def load(
+        cls, path, max_staleness_candles: int | None = 3, expected_sha256: str | None = None
+    ) -> "PredictionEngine":
         path = Path(path)
         if not path.exists():
             raise ModelNotFoundError(f"Model file not found: {path}")
 
         try:
-            artifact = joblib.load(path)
+            data = path.read_bytes()
+        except OSError as err:
+            raise IncompatibleModelError(f"Could not read model file: {err}") from err
+        digest = hashlib.sha256(data).hexdigest()
+        # joblib files can run code when loaded, so check the file before opening it.
+        if expected_sha256 is not None and digest != expected_sha256:
+            raise IncompatibleModelError(f"Checksum mismatch for {path.name}")
+
+        try:
+            artifact = joblib.load(io.BytesIO(data))
         except Exception as err:
             raise IncompatibleModelError(f"Could not read model file: {err}") from err
 
@@ -87,14 +102,14 @@ class PredictionEngine:
         if metadata.get("feature_columns") != FEATURE_COLUMNS:
             raise IncompatibleModelError("Model feature names/order differ from the current pipeline")
 
-        return cls(model, metadata, max_staleness_candles)
+        return cls(model, metadata, max_staleness_candles, digest[:8])
 
     @property
     def model_version(self) -> str:
         trained_day = self.metadata["trained_at_utc"][:10]
         version = f"{self.metadata['feature_version']}-{trained_day}"
         name = self.metadata.get("model_name")
-        return f"{name}-{version}" if name else version
+        return "-".join(part for part in (name, version, self.artifact_id) if part)
 
     def predict(self, candles, now=None) -> Prediction:
         now = now or datetime.now(timezone.utc)
@@ -154,4 +169,5 @@ class PredictionEngine:
                 "data_age_minutes": round(age.total_seconds() / 60, 1),
             },
             disclaimer=DISCLAIMER,
+            threshold=self.metadata["threshold"],
         )

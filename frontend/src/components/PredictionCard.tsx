@@ -2,6 +2,7 @@ import type { Direction, PredictionResult } from "../api/types";
 import type { ApiError } from "../api/client";
 import { formatAge, formatPercent, formatUtc } from "../format";
 import { DirectionBadge } from "./DirectionBadge";
+import { SlideButton } from "./SlideButton";
 import { Card, ErrorBox, Loading } from "./StateViews";
 
 export type PredictionState =
@@ -23,12 +24,10 @@ export function PredictionCard({ state, onPredict, symbolLabel }: Props) {
 
   return (
     <Card title="Direction forecast" id="prediction-title">
-      <button type="button" className="button" onClick={onPredict} disabled={busy}>
-        {busy ? "Calculating…" : `Get forecast for ${symbolLabel}`}
-      </button>
+      <SlideButton label={`Get forecast for ${symbolLabel}`} busyLabel="Calculating…" busy={busy} onConfirm={onPredict} />
 
       {state.status === "idle" && (
-        <p className="state state-empty">Press the button to run the model on the latest closed candles.</p>
+        <p className="state state-empty">Slide or tap to run the model on the latest closed candles.</p>
       )}
       {state.status === "loading" && <Loading label="Fetching candles and running the model…" />}
       {state.status === "error" && <ErrorBox error={state.error} onRetry={onPredict} />}

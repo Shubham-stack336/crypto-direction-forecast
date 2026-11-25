@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -82,6 +82,7 @@ function installApi(overrides: Routes = {}) {
     "GET /api/v1/predictions/BTC-USDT/history": () => ({
       body: { items: [...saved].reverse(), total: saved.length, limit: 20, offset: 0 } satisfies HistoryPage,
     }),
+    "GET /api/v1/market/SHIB-USDT": () => ({ body: { ...market, symbol: "SHIB/USDT" } }),
     "POST /api/v1/predictions/BTC-USDT": () => {
       saved.push(savedItem);
       return { body: prediction };
@@ -128,48 +129,108 @@ function installApi(overrides: Routes = {}) {
   return fetchMock;
 }
 
-const region = (name: string) => screen.getByRole("region", { name });
+const region = (name: string) => screen.findByRole("region", { name });
 
-afterEach(() => vi.unstubAllGlobals());
+function open(path: string) {
+  window.history.pushState({}, "", path);
+  return render(<App />);
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  localStorage.clear();
+});
 
 describe("App", () => {
   it("always shows the uncertainty disclaimer", async () => {
     installApi();
-    render(<App />);
+    open("/forecast");
     expect(screen.getByRole("note", { name: /uncertainty disclaimer/i })).toHaveTextContent(/not financial advice/i);
     await screen.findByText(/API ready/);
   });
 
-  it("shows API status, market freshness, evaluation metrics and an empty history", async () => {
+  it("shows API status, market freshness and an empty history", async () => {
     installApi();
-    render(<App />);
+    open("/forecast");
 
     expect(screen.getAllByRole("status").some((el) => /Checking API/.test(el.textContent ?? ""))).toBe(true);
     expect(screen.getByText(/can take up to a minute to wake up/)).toBeInTheDocument();
     expect(await screen.findByText("API ready · database connected")).toBeInTheDocument();
 
-    const marketCard = region("Market data");
-    expect(await within(marketCard).findByText("81,234.5")).toBeInTheDocument();
+    const marketCard = await region("Market data");
+    expect(await within(marketCard).findByLabelText("81,234.5")).toBeInTheDocument();
     expect(within(marketCard).getByText(/Data is fresh/)).toBeInTheDocument();
 
-    const modelCard = region("Model evaluation");
+    expect(await within(await region("Prediction history")).findByText(/No forecasts saved yet/)).toBeInTheDocument();
+    expect(screen.getByText(/3 candles \(3 hours ahead\)/)).toBeInTheDocument();
+  });
+
+  it("shows evaluation metrics on the model page", async () => {
+    installApi();
+    open("/model");
+    const modelCard = await region("Model evaluation");
     expect(await within(modelCard).findByText("Random forest (the model used)")).toBeInTheDocument();
     expect(within(modelCard).getByText("Naive: always the most common class")).toBeInTheDocument();
     expect(within(modelCard).getByText("n/a")).toBeInTheDocument();
 
-    expect(await within(region("Prediction history")).findByText(/No forecasts saved yet/)).toBeInTheDocument();
-    expect(screen.getByText(/3 candles \(3 hours ahead\)/)).toBeInTheDocument();
+  });
+
+  it("home shows the price, coin cards and links to the forecast", async () => {
+    const user = userEvent.setup();
+    installApi();
+    open("/");
+    expect(await screen.findByLabelText("81,234.5")).toBeInTheDocument();
+    const cards = await screen.findByRole("region", { name: "Most traded coins" });
+    expect(await within(cards).findByText("Shiba Inu")).toBeInTheDocument();
+    await user.click(screen.getByRole("link", { name: "Forecast BTC" }));
+    expect(await screen.findByRole("button", { name: /Get forecast for BTC\/USDT/ })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/forecast/BTC-USDT");
+  });
+
+  it("links to the author's LinkedIn and GitHub", async () => {
+    installApi();
+    open("/about");
+    await screen.findByRole("heading", { name: "About" });
+    for (const link of screen.getAllByRole("link", { name: "LinkedIn" }))
+      expect(link).toHaveAttribute("href", "https://www.linkedin.com/in/shubham-kumar-30877a398/");
+    for (const link of screen.getAllByRole("link", { name: "GitHub" }))
+      expect(link).toHaveAttribute("href", "https://github.com/Shubham-stack336");
+  });
+
+  it("shows a not found page for unknown addresses", async () => {
+    installApi();
+    open("/nothing-here");
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument();
+  });
+
+  it("a slide that is let go too early does not run a forecast", async () => {
+    const fetchMock = installApi();
+    open("/forecast");
+    const button = await screen.findByRole("button", { name: /Get forecast/ });
+    button.getBoundingClientRect = () => ({ width: 400, height: 76 }) as DOMRect;
+    fireEvent.pointerDown(button, { clientX: 10 });
+    fireEvent.pointerMove(button, { clientX: 60 });
+    fireEvent.pointerUp(button, { clientX: 60 });
+    fireEvent.click(button);
+    const posted = () => fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "POST");
+    expect(posted()).toBe(false);
+    fireEvent.pointerDown(button, { clientX: 10 });
+    fireEvent.pointerMove(button, { clientX: 330 });
+    fireEvent.pointerUp(button, { clientX: 330 });
+    fireEvent.click(button);
+    await screen.findByText(/Next 3 hours/);
+    expect(posted()).toBe(true);
   });
 
   it("runs a forecast on click, shows probabilities, and refreshes the history", async () => {
     const user = userEvent.setup();
     installApi();
-    render(<App />);
-    await within(region("Prediction history")).findByText(/No forecasts saved yet/);
+    open("/forecast");
+    await within(await region("Prediction history")).findByText(/No forecasts saved yet/);
 
     await user.click(screen.getByRole("button", { name: /Get forecast for BTC\/USDT/ }));
 
-    const card = region("Direction forecast");
+    const card = await region("Direction forecast");
     expect(await within(card).findByText(/Next 3 hours/)).toBeInTheDocument();
     const bars = within(card).getByRole("list", { name: "Probability estimates" });
     expect(bars).toHaveTextContent("48.1%");
@@ -177,7 +238,7 @@ describe("App", () => {
     expect(bars).toHaveTextContent("24.6%");
     expect(within(card).getByText(/not guarantees/i)).toBeInTheDocument();
 
-    const historyCard = region("Prediction history");
+    const historyCard = await region("Prediction history");
     expect(await within(historyCard).findByText(/Showing the latest 1 of 1/)).toBeInTheDocument();
   });
 
@@ -185,30 +246,31 @@ describe("App", () => {
     localStorage.clear();
     const user = userEvent.setup();
     installApi();
-    render(<App />);
-    const explorer = region("Coin explorer");
+    open("/coins");
+    const explorer = await region("Coin explorer");
     await user.type(await within(explorer).findByLabelText("Search coins"), "shi");
     expect(within(explorer).getByText("0.00001234")).toBeInTheDocument();
     expect(within(explorer).queryByLabelText("Open BTC")).toBeNull();
     await user.click(within(explorer).getByRole("button", { name: "Watch SHIB" }));
     expect(JSON.parse(localStorage.getItem("watchlist")!)).toEqual(["SHIB-USDT"]);
     await user.click(within(explorer).getByRole("button", { name: "Open SHIB" }));
-    expect(screen.getByRole("button", { name: /Get forecast for SHIB\/USDT/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Get forecast for SHIB\/USDT/ })).toBeInTheDocument();
   });
 
   it("scans only on request and shows the track record", async () => {
     const user = userEvent.setup();
     const fetchMock = installApi();
-    render(<App />);
-    expect(await within(region("Track record")).findByText(/1 of 2 saved forecasts were right/)).toBeInTheDocument();
+    open("/forecast");
+    expect(await within(await region("Track record")).findByText(/1 of 2 saved forecasts were right/)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([u]) => String(u).includes("/scan"))).toBe(false);
-    await user.click(screen.getByRole("button", { name: "Scan 12 coins" }));
-    expect(await within(region("Market scanner")).findByText("50.0%")).toBeInTheDocument();
+    await user.click(within(screen.getByRole("navigation")).getByRole("link", { name: "Scanner" }));
+    await user.click(await screen.findByRole("button", { name: "Scan 12 coins" }));
+    expect(await within(await region("Market scanner")).findByText("50.0%")).toBeInTheDocument();
   });
 
   it("does not run a forecast until the user asks for one", async () => {
     const fetchMock = installApi();
-    render(<App />);
+    open("/forecast");
     await screen.findByText("API ready · database connected");
     expect(fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "POST")).toBe(false);
   });
@@ -221,11 +283,11 @@ describe("App", () => {
         body: { detail: "Market data is too old to produce a reliable prediction" },
       }),
     });
-    render(<App />);
+    open("/forecast");
 
-    await user.click(screen.getByRole("button", { name: /Get forecast/ }));
+    await user.click(await screen.findByRole("button", { name: /Get forecast/ }));
 
-    const card = region("Direction forecast");
+    const card = await region("Direction forecast");
     expect(await within(card).findByRole("alert")).toHaveTextContent(/too old/);
     expect(within(card).getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
@@ -234,10 +296,10 @@ describe("App", () => {
     installApi({
       "GET /api/v1/market/BTC-USDT": () => ({ status: 503, body: { detail: "Market data provider is currently unavailable" } }),
     });
-    render(<App />);
+    open("/forecast");
 
-    expect(await within(region("Market data")).findByRole("alert")).toHaveTextContent(/currently unavailable/);
-    expect(await within(region("Model evaluation")).findByText("Random forest (the model used)")).toBeInTheDocument();
+    expect(await within(await region("Market data")).findByRole("alert")).toHaveTextContent(/currently unavailable/);
+    expect(await within(await region("Track record")).findByText(/1 of 2/)).toBeInTheDocument();
   });
 
   it("shows an offline state when the API cannot be reached", async () => {
@@ -248,17 +310,17 @@ describe("App", () => {
       "GET /api/v1/models/BTC-USDT/status": () => new TypeError("Failed to fetch"),
       "GET /api/v1/predictions/BTC-USDT/history": () => new TypeError("Failed to fetch"),
     });
-    render(<App />);
+    open("/forecast");
 
     expect(await screen.findByText("API offline")).toBeInTheDocument();
-    expect(await within(region("Market data")).findByRole("alert")).toHaveTextContent("Cannot reach the API.");
+    expect(await within(await region("Market data")).findByRole("alert")).toHaveTextContent("Cannot reach the API.");
   });
 
   it("explains when the API is up but not ready", async () => {
     installApi({
       "GET /health/ready": () => ({ status: 503, body: { detail: "Database is unavailable" } }),
     });
-    render(<App />);
+    open("/forecast");
     expect(await screen.findByText(/API online, not ready: Database is unavailable/)).toBeInTheDocument();
   });
 
@@ -269,7 +331,7 @@ describe("App", () => {
         body: { detail: "Prediction history storage is not configured" },
       }),
     });
-    render(<App />);
-    expect(await within(region("Prediction history")).findByRole("alert")).toHaveTextContent(/not configured/);
+    open("/forecast");
+    expect(await within(await region("Prediction history")).findByRole("alert")).toHaveTextContent(/not configured/);
   });
 });

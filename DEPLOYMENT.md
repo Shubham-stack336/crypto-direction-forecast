@@ -111,7 +111,20 @@ Browser sirf wahi website API ko call kar sakti hai jo `APP_CORS_ORIGINS` mein l
 ## 6. Model badalna
 
 1. `ml_engine` mein dobara train karo (`python scripts/step12_final.py`).
-2. `ml_engine/artifacts/*` ko `backend/artifacts/` mein copy karo.
-3. `git add`, `git commit`, `git push`. Render khud redeploy kar dega.
+2. `ml_engine/artifacts/*` ko `backend/artifacts/` mein copy karo, phir `backend` se `python scripts/model_registry.py publish`
+   chalao. Isse `manifest.json` ke checksum update hote hain; iske bina API naya model load nahi karegi.
+   Wapas jaane ke liye: `python scripts/model_registry.py list` aur phir `rollback <naam> <id>`.
+3. `git add`, `git commit`, `git push`. GitHub Actions pass hone ke baad Render redeploy karega.
 
 Naya model tabhi use karo jab uska test result imaandari se dekh liya ho. Test set se model chunna ya tune karna galat hai.
+
+## 7. Production settings
+
+- `render.yaml` mein background scan, KuCoin fallback aur metrics token on hain. Fallback ka data use ho to forecast ke
+  `data_quality.source` mein exchange ka naam aata hai (models Binance ke data par train hue hain).
+- Rate limit client IP par hai. Deploy ke baad zaroor check karo ki Render `CF-Connecting-IP` bhejta hai; agar nahi, to
+  sab users ek hi limit share karenge (`APP_CLIENT_IP_HEADER` badlo).
+- Ek se zyada instance ya worker chalane se pehle `APP_REDIS_URL` set karo, warna cache aur rate limit alag-alag honge.
+- `APP_SENTRY_DSN` set karne par errors Sentry mein jaate hain. `/metrics` ko `Authorization: Bearer <APP_METRICS_TOKEN>` chahiye.
+- Asli users se pehle paid database lo, jisme backup ho.
+- Frontend ke pages ke direct links ke liye `frontend/vercel.json` zaroori hai (already hai).

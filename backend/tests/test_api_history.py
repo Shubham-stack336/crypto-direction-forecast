@@ -1,4 +1,4 @@
-from tests.conftest import FakeMarketRepository
+from tests.conftest import FakeMarketRepository, make_prediction
 
 
 def test_prediction_is_saved_and_appears_in_history(make_client, live_market, history_repo):
@@ -21,8 +21,8 @@ def test_prediction_is_saved_and_appears_in_history(make_client, live_market, hi
 
 def test_history_is_newest_first_with_pagination(make_client, live_market, history_repo):
     client = make_client(FakeMarketRepository(live_market), history_repo=history_repo)
-    for _ in range(3):
-        client.post("/api/v1/predictions/BTC-USDT")
+    for hour in range(3):
+        history_repo.add(make_prediction("UP", at=f"2026-01-20T0{hour}:00:00+00:00"))
 
     body = client.get("/api/v1/predictions/BTC-USDT/history?limit=2").json()
     assert body["total"] == 3 and len(body["items"]) == 2 and body["limit"] == 2
@@ -85,5 +85,5 @@ def test_model_version_is_registered_once(make_client, live_market, history_repo
     with db_engine.connect() as connection:
         rows = connection.execute(text("SELECT model_version, evaluation FROM model_versions")).all()
     assert len(rows) == 1
-    assert rows[0][0] == "v1-2026-01-01"
+    assert rows[0][0].startswith("v1-2026-01-01-")
     assert rows[0][1]["candidate_model"] == "synthetic-test-model"

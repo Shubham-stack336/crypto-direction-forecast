@@ -33,9 +33,22 @@ class FileModelRepository:
         with self._lock:
             engine = self._engines.get(path)
             if engine is None:
-                engine = PredictionEngine.load(path, self._max_staleness)
+                engine = PredictionEngine.load(
+                    path, self._max_staleness, expected_sha256=self._expected(path)
+                )
                 self._engines[path] = engine
             return engine
+
+    def _expected(self, path: Path) -> str | None:
+        """The checksum from manifest.json. A folder with a manifest only serves files listed in it."""
+        manifest = self._dir / "manifest.json"
+        if not manifest.exists():
+            return None
+        try:
+            checksums = json.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as err:
+            raise IncompatibleModelError("manifest.json is unreadable") from err
+        return checksums.get(path.name, "not in manifest")
 
     def get_engine(self, symbol: str, timeframe: str) -> PredictionEngine:
         return self._load(self._model_path(self.model_symbol(symbol, timeframe), timeframe))

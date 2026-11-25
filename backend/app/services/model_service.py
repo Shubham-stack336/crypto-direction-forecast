@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Tuple
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -23,6 +23,7 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
 )
+from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -154,9 +155,14 @@ class ModelService:
         baseline_acc = results["naive_baseline"]["accuracy"]
         baseline_bal = results["naive_baseline"]["balanced_accuracy"]
 
-        # Select candidate: highest balanced accuracy among ML models
+        # Select the candidate on time-ordered folds of the training data; the test set only reports
         ml_names = ["random_forest", "gradient_boosting", "logistic_regression"]
-        best_ml = max(ml_names, key=lambda m: results[m]["balanced_accuracy"])
+        folds = TimeSeriesSplit(n_splits=4)
+        validation = {
+            m: cross_val_score(clone(models[m]), X_train, y_train, cv=folds, scoring="balanced_accuracy").mean()
+            for m in ml_names
+        }
+        best_ml = max(ml_names, key=validation.get)
         candidate_metrics = results[best_ml]
 
         edge = round(candidate_metrics["accuracy"] - baseline_acc, 4)

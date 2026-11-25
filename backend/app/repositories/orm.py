@@ -55,6 +55,14 @@ class PredictionRecord(Base):
             "prediction_time_utc",
             "id",
         ),
+        Index(
+            "uq_predictions_candle_model",
+            "symbol",
+            "timeframe",
+            "latest_candle_utc",
+            "model_version",
+            unique=True,
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigId, Identity(), primary_key=True)
@@ -70,6 +78,9 @@ class PredictionRecord(Base):
     model_version: Mapped[str] = mapped_column(String(50), nullable=False)
     feature_version: Mapped[str] = mapped_column(String(20), nullable=False)
     data_quality: Mapped[dict] = mapped_column(JsonDoc, nullable=False)
+    threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    outcome_label: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    outcome_return: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         UtcDateTime, nullable=False, server_default=func.now()
     )

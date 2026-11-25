@@ -1,7 +1,8 @@
 import type { ApiError } from "../api/client";
 import type { AsyncState } from "../api/useAsync";
 import type { MarketData } from "../api/types";
-import { formatAge, formatPrice, formatUtc } from "../format";
+import { formatAge, formatUtc } from "../format";
+import { BigNumber } from "./BigNumber";
 import { Card, ErrorBox, Loading } from "./StateViews";
 import { SpatialChart } from "./SpatialChart";
 
@@ -19,7 +20,7 @@ export function MarketCard({ state, onRetry }: Props) {
         <>
           <div className="market-price-row">
             <div>
-              <p className="price">{formatPrice(state.data.last_close)}</p>
+              <BigNumber value={state.data.last_close} />
               <p className="hint">last closed {state.data.timeframe} candle</p>
             </div>
             <p className={state.data.is_fresh ? "fresh fresh-yes" : "fresh fresh-no"}>

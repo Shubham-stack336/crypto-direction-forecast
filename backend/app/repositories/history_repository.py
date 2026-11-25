@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from sqlalchemy import func, select, text
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -13,6 +13,7 @@ from app.repositories.database import dialect_insert, session_scope
 from app.repositories.orm import ModelVersionRecord, PredictionRecord
 
 logger = logging.getLogger(__name__)
+IDENTITY_COLUMNS = ("symbol", "timeframe", "latest_candle_utc", "model_version")
 
 
 class HistoryStorageError(Exception):
@@ -35,6 +36,9 @@ class StoredPrediction:
     latest_candle_utc: str
     model_version: str
     feature_version: str
+    threshold: float | None = None
+    outcome_label: str | None = None
+    outcome_return: float | None = None
 
 
 class HistoryRepository(Protocol):
@@ -46,6 +50,8 @@ class HistoryRepository(Protocol):
 
     def register_model(self, model_version: str, metadata: dict, evaluation: dict | None) -> None: ...
 
+    def save_outcomes(self, outcomes: dict[int, tuple[str, float]]) -> None: ...
+
     def ping(self) -> None: ...
 
 
@@ -55,7 +61,7 @@ class PostgresHistoryRepository:
 
     def add(self, prediction: Prediction) -> int:
         probs = prediction.probabilities
-        row = PredictionRecord(
+        values = dict(
             symbol=prediction.symbol,
             timeframe=prediction.timeframe,
             horizon_candles=prediction.horizon_candles,
@@ -68,12 +74,17 @@ class PostgresHistoryRepository:
             model_version=prediction.model_version,
             feature_version=prediction.feature_version,
             data_quality=prediction.data_quality,
+            threshold=prediction.threshold,
         )
         try:
             with session_scope(self._factory) as session:
-                session.add(row)
-                session.flush()
-                return row.id
+                statement = dialect_insert(session, PredictionRecord).values(**values)
+                updated = {k: statement.excluded[k] for k in values if k not in IDENTITY_COLUMNS}
+                return session.execute(
+                    statement.on_conflict_do_update(
+                        index_elements=list(IDENTITY_COLUMNS), set_=updated
+                    ).returning(PredictionRecord.id)
+                ).scalar_one()
         except SQLAlchemyError as err:
             logger.warning("could not save prediction: %s", type(err).__name__)
             raise HistoryStorageError("could not save prediction") from err
@@ -104,6 +115,9 @@ class PostgresHistoryRepository:
                         latest_candle_utc=r.latest_candle_utc.isoformat(),
                         model_version=r.model_version,
                         feature_version=r.feature_version,
+                        threshold=r.threshold,
+                        outcome_label=r.outcome_label,
+                        outcome_return=r.outcome_return,
                     )
                     for r in rows
                 ]
@@ -133,6 +147,31 @@ class PostgresHistoryRepository:
         except SQLAlchemyError as err:
             logger.warning("could not register model version: %s", type(err).__name__)
             raise HistoryStorageError("could not register model version") from err
+
+    def save_outcomes(self, outcomes: dict[int, tuple[str, float]]) -> None:
+        """Write what really happened, once, so the record survives after the candles are gone."""
+        if not outcomes:
+            return
+        try:
+            with session_scope(self._factory) as session:
+                for row_id, (label, change) in outcomes.items():
+                    session.execute(
+                        update(PredictionRecord)
+                        .where(PredictionRecord.id == row_id, PredictionRecord.outcome_label.is_(None))
+                        .values(outcome_label=label, outcome_return=change)
+                    )
+        except SQLAlchemyError as err:
+            logger.warning("could not save outcomes: %s", type(err).__name__)
+            raise HistoryStorageError("could not save outcomes") from err
+
+    def purge_older_than(self, cutoff: datetime) -> int:
+        try:
+            with session_scope(self._factory) as session:
+                return session.execute(
+                    delete(PredictionRecord).where(PredictionRecord.prediction_time_utc < cutoff)
+                ).rowcount
+        except SQLAlchemyError as err:
+            raise HistoryStorageError("could not purge history") from err
 
     def ping(self) -> None:
         try:

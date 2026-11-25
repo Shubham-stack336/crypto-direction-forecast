@@ -1,14 +1,11 @@
 """Data Service Layer.
 
 Business logic for fetching, cleaning, validating, and managing
-historical cryptocurrency data with resilient offline fallback.
+historical cryptocurrency data.
 """
 
-from datetime import datetime, timezone
 import logging
-from pathlib import Path
 from typing import Any
-import numpy as np
 import pandas as pd
 
 from app.repositories.data_repository import DataRepository
@@ -40,8 +37,6 @@ SUPPORTED_SYMBOLS = {
 }
 
 REQUIRED_COLUMNS = ["open", "high", "low", "close", "volume"]
-WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
-RAW_BTC_1H = WORKSPACE_ROOT / "ml_engine" / "data" / "raw" / "btc_usdt_1h.csv"
 
 
 class DataService:
@@ -57,80 +52,10 @@ class DataService:
         base = clean.replace("/USDT", "").replace("-USDT", "").replace("/USD", "").replace("-USD", "")
         return f"{base}-USD"
 
-    def _generate_fallback_data(self, ticker: str, periods: int = 500) -> pd.DataFrame:
-        """Resample existing local historical data or generate realistic calibrated crypto series."""
-        if "BTC" in ticker and RAW_BTC_1H.exists():
-            try:
-                raw_df = pd.read_csv(RAW_BTC_1H)
-                raw_df["timestamp"] = pd.to_datetime(raw_df["timestamp"], utc=True)
-                raw_df = raw_df.set_index("timestamp").sort_index()
-                
-                # Resample 1h to 1d OHLCV
-                daily = pd.DataFrame()
-                daily["open"] = raw_df["open"].resample("1D").first()
-                daily["high"] = raw_df["high"].resample("1D").max()
-                daily["low"] = raw_df["low"].resample("1D").min()
-                daily["close"] = raw_df["close"].resample("1D").last()
-                daily["volume"] = raw_df["volume"].resample("1D").sum()
-                daily = daily.dropna()
-                
-                if len(daily) >= 50:
-                    daily.index = daily.index.tz_localize(None)
-                    daily.index.name = "date"
-                    return daily[REQUIRED_COLUMNS]
-            except Exception as e:
-                logger.warning(f"Could not resample local btc_usdt_1h.csv: {e}")
-
-        # Deterministic calibrated seed generation for reliable offline testing & demos
-        seed_map = {"BTC": 42, "ETH": 101, "SOL": 202, "DOGE": 303, "ADA": 404, "XRP": 505}
-        seed = 42
-        for k, v in seed_map.items():
-            if k in ticker:
-                seed = v
-                break
-        np.random.seed(seed)
-
-        if "BTC" in ticker:
-            base_price = 60000.0
-        elif "ETH" in ticker:
-            base_price = 3200.0
-        elif "SOL" in ticker:
-            base_price = 160.0
-        elif "DOGE" in ticker:
-            base_price = 0.16
-        elif "ADA" in ticker:
-            base_price = 0.55
-        elif "XRP" in ticker:
-            base_price = 0.65
-        else:
-            base_price = 100.0
-        dates = pd.date_range(end=pd.Timestamp.now().normalize(), periods=periods, freq="D")
-        
-        # Crypto daily log-returns (mean ~0.0005, vol ~0.035)
-        daily_returns = np.random.normal(loc=0.0005, scale=0.032, size=periods)
-        price_series = base_price * np.exp(np.cumsum(daily_returns))
-        
-        high_noise = np.abs(np.random.normal(0, 0.015, periods))
-        low_noise = np.abs(np.random.normal(0, 0.015, periods))
-        open_noise = np.random.normal(0, 0.008, periods)
-        
-        closes = price_series
-        opens = price_series * (1 + open_noise)
-        highs = np.maximum(opens, closes) * (1 + high_noise)
-        lows = np.minimum(opens, closes) * (1 - low_noise)
-        volumes = np.random.uniform(500000000, 2500000000, periods)
-        
-        df = pd.DataFrame(
-            {"open": opens, "high": highs, "low": lows, "close": closes, "volume": volumes},
-            index=dates,
-        )
-        df.index.name = "date"
-        return df
-
     def fetch_historical(
         self, symbol: str, period: str = "5y", interval: str = "1d"
     ) -> pd.DataFrame:
-        """Fetch historical daily OHLCV from yfinance with seamless local fallback."""
+        """Fetch historical daily OHLCV from yfinance."""
         ticker = self.normalize_symbol(symbol)
         logger.info(f"Fetching {ticker} historical data (period={period}, interval={interval})")
 
@@ -144,12 +69,11 @@ class DataService:
                 else:
                     df.columns = [str(c).lower() for c in df.columns]
         except Exception as e:
-            logger.warning(f"Live fetch from yfinance failed for {ticker}: {e}. Engaging offline fallback.")
+            logger.warning(f"Live fetch from yfinance failed for {ticker}: {e}.")
 
-        # If live fetch was empty or failed, use local calibrated data
-        if df is None or df.empty or len(df) < 50:
-            logger.info(f"Using calibrated historical offline data for {ticker}")
-            df = self._generate_fallback_data(ticker)
+        # Never replace missing prices with invented ones.
+        if df is None or df.empty:
+            raise ValueError(f"No market data available for {ticker}")
 
         # Verify required columns exist
         missing = [col for col in REQUIRED_COLUMNS if col not in df.columns]

@@ -1,8 +1,7 @@
-
 databases:
   - name: crypto-predictions-db
     region: frankfurt
-    plan: free              
+    plan: free # expires after 30 days: choose a paid plan with backups before real users
     databaseName: crypto_predictions
     user: crypto_app
     postgresMajorVersion: "16"
@@ -12,15 +11,15 @@ services:
     name: crypto-direction-api
     runtime: python
     region: frankfurt
-    plan: free             
+    plan: free # sleeps when idle
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health/live
-    autoDeployTrigger: commit
+    autoDeployTrigger: checksPass # deploy only when GitHub Actions is green
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.9      
+        value: 3.11.9
       - key: APP_ENVIRONMENT
         value: production
       - key: APP_DATABASE_URL
@@ -28,4 +27,14 @@ services:
           name: crypto-predictions-db
           property: connectionString
       - key: APP_CORS_ORIGINS
-        sync: false        
+        sync: false
+      - key: APP_BACKGROUND_JOBS
+        value: "true"
+      - key: APP_FALLBACK_EXCHANGE_IDS
+        value: '["kucoin"]'
+      # Render is behind Cloudflare, which sets this header itself. Check after the first deploy.
+      - key: APP_CLIENT_IP_HEADER
+        value: CF-Connecting-IP
+      - key: APP_METRICS_TOKEN
+        generateValue: true
+      # Optional: APP_REDIS_URL (needed for more than one instance), APP_SENTRY_DSN

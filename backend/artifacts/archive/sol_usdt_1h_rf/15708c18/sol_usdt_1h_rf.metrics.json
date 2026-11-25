@@ -1,0 +1,85 @@
+{
+  "candidate_model": "random_forest",
+  "test_period": [
+    "2026-08-07 09:00:00+00:00",
+    "2026-11-24 05:00:00+00:00"
+  ],
+  "test_rows": 2613,
+  "test_class_distribution": {
+    "UP": 877,
+    "DOWN": 873,
+    "SIDEWAYS": 863
+  },
+  "results": {
+    "random_forest": {
+      "accuracy": 0.3784921546115576,
+      "balanced_accuracy": 0.37995807006195376,
+      "macro_f1": 0.34835006442827116,
+      "directional_hit_rate": 0.5,
+      "confusion_matrix_rows_true_cols_pred": [
+        [
+          176,
+          499,
+          198
+        ],
+        [
+          143,
+          608,
+          112
+        ],
+        [
+          183,
+          489,
+          205
+        ]
+      ]
+    },
+    "logistic_regression": {
+      "accuracy": 0.3723689246077306,
+      "balanced_accuracy": 0.3741549039017809,
+      "macro_f1": 0.3271001439028283,
+      "directional_hit_rate": 0.5281090289608177,
+      "confusion_matrix_rows_true_cols_pred": [
+        [
+          141,
+          596,
+          136
+        ],
+        [
+          93,
+          663,
+          107
+        ],
+        [
+          141,
+          567,
+          169
+        ]
+      ]
+    },
+    "naive_most_frequent": {
+      "accuracy": 0.3340987370838117,
+      "balanced_accuracy": 0.3333333333333333,
+      "macro_f1": 0.16695352839931155,
+      "directional_hit_rate": 0.49885714285714283,
+      "confusion_matrix_rows_true_cols_pred": [
+        [
+          873,
+          0,
+          0
+        ],
+        [
+          863,
+          0,
+          0
+        ],
+        [
+          877,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  "note": "Real Binance candles. BTC recipe, not tuned. Logistic regression and naive are reference only."
+}

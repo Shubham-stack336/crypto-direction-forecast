@@ -1,0 +1,5 @@
+# Only for streamlit_app.py (the older daily-data demo). Not installed in production.
+-r requirements.txt
+yfinance==1.4.0
+pyarrow==26.0.1
+streamlit>=1.30.0
