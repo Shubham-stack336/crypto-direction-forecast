@@ -69,7 +69,16 @@ class Settings(BaseSettings):
     def reject_wildcard_origin(cls, value: list[str]) -> list[str]:
         if "*" in value:
             raise ValueError("APP_CORS_ORIGINS must list explicit origins, not '*'")
-        return value
+        defaults = [
+            "https://crypto-direction-forecast.vercel.app",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ]
+        merged = list(value)
+        for d in defaults:
+            if d not in merged:
+                merged.append(d)
+        return merged
 
     @model_validator(mode="after")
     def production_requires_database(self) -> "Settings":

@@ -1,10 +1,27 @@
 import type { Coin, HistoryPage, MarketData, ModelStatus, PredictionResult, Readiness, RecordSummary, ScanRow, TrackRecord } from "./types";
 
-const DEFAULT_BASE_URL = "http://127.0.0.1:8000";
+const DEFAULT_LOCAL_URL = "http://127.0.0.1:8000";
+const PRODUCTION_API_URL = "https://crypto-direction-api-6u98.onrender.com";
 // A free hosting plan can need about a minute to wake a sleeping server on the first request.
 const REQUEST_TIMEOUT_MS = 60_000;
 
-export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, "");
+function resolveApiBaseUrl(): string {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  // If envUrl is the old/broken URL without -6u98, auto-repair to the live deployed instance
+  if (envUrl && envUrl.includes("crypto-direction-api.onrender.com") && !envUrl.includes("6u98")) {
+    return PRODUCTION_API_URL;
+  }
+  if (envUrl && envUrl.trim() !== "") {
+    return envUrl.trim().replace(/\/+$/, "");
+  }
+  // When running in production on Vercel, default to the live Render backend
+  if (import.meta.env.PROD) {
+    return PRODUCTION_API_URL;
+  }
+  return DEFAULT_LOCAL_URL;
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 export class ApiError extends Error {
   readonly status: number;
